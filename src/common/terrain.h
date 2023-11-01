@@ -14,18 +14,12 @@
  * @note 2 bytes voxels and 2x2x2 1-cache-line chunks is also possible
  */
 typedef u8 Voxel;
-typedef bool VoxelBit;
 
 /**
  * 8x8x8x1 bytes aka FOUR cache lines
  * Contains voxels by value.
  */
-typedef Voxel Chunk[64];
-
-/**
- *
- */
-typedef VoxelBit ChunkBit[64];
+typedef Voxel Chunk[512];
 
 /**
  * 4x4x4x4 bytes aka TWO cache line

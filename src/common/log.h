@@ -3,23 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define INFO(message, ...) printf("[INFO] %s:%d ", __FILE__, __LINE__); printf(message, ##__VA_ARGS__); printf("\n")
-/*static inline void info(const char *message, const char *file, int line) {
-    printf("[INFO] %s:%d %s\n", file, line, message);
-}*/
-
-#define WARN(message) warn(message, __FILE__, __LINE__)
-static inline void warn(const char *message, const char *file, int line) {
-    printf("[WARN] %s:%d %s\n", file, line, message);
-}
-
-#define ERROR(message) error(message, __FILE__, __LINE__)
-static inline void error(const char *message, const char *file, int line) {
-    printf("[ERROR] %s:%d %s\n", file, line, message);
-}
-
-#define FATAL(message) fatal(message, __FILE__, __LINE__)
-static inline void fatal(const char *message, const char *file, int line) {
-    printf("[FATAL] %s:%d %s\n", file, line, message);
-    exit(1);
-}
+#define INFO(_message, ...) {printf("[INFO] %s:%d ", __FILE__, __LINE__); printf(_message, ##__VA_ARGS__); printf("\n");}
+#define WARN(_message, ...) {printf("[WARN] %s:%d ", __FILE__, __LINE__); printf(_message, ##__VA_ARGS__); printf("\n");}
+#define ERROR(_message, ...) {fprintf(stderr, "[ERROR] %s:%d ", __FILE__, __LINE__); fprintf(stderr, _message, ##__VA_ARGS__); fprintf(stderr, "\n");}
+#define FATAL(_message, ...) {fprintf(stderr, "[FATAL] %s:%d ", __FILE__, __LINE__); fprintf(stderr, _message, ##__VA_ARGS__); fprintf(stderr, "\n"); exit(0);}

@@ -33,7 +33,7 @@ void terrain_init(Terrain *terrain, u32 depth) {
     // allocate ~128 Mo of RAM for each pool
     u32 initialPoolSize = 128 * 1024;
     poolAllocatorCreate(&terrain->chunkPool, initialPoolSize, sizeof(Chunk), NULL);
-    poolAllocatorCreate(&terrain->nodePool, initialPoolSize, sizeof(Node)*2, NULL);
+    poolAllocatorCreate(&terrain->nodePool, initialPoolSize, sizeof(Node), NULL);
 
     // Setup the worldgen noises
     srand(41233125);
@@ -145,9 +145,9 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                         (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | subnode_id;
                         stats->mixed_nodes_per_level[depth] += 1;
                         terrain_generate_recursive(terrain,
-                                                   (cx + dx)*NODE_WIDTH,
-                                                   (cy + dy)*NODE_WIDTH,
-                                                   (cz + dz)*NODE_WIDTH,
+                                                   (cx + dx) * NODE_WIDTH,
+                                                   (cy + dy) * NODE_WIDTH,
+                                                   (cz + dz) * NODE_WIDTH,
                                                    width_chunks * NODE_WIDTH,
                                                    depth,
                                                    approx_heightmaps,
@@ -166,26 +166,42 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
 static void terrain_generate(Terrain *terrain) {
     // issue: we want bot to top heightmap to have a real min but top to bot gen to have minimum terrain
     // solution: generate them separately, starting with the heightmap at chunk res!
+
+    /**
+     * Generating the heightmaps using a first recursive function
+     */
     u32 time = uclock();
-    terrain->approx_heightmaps = (u32 **) malloc(terrain->depth * sizeof(u32 *));
+    terrain->approx_heightmaps = (u32 **) malloc((terrain->depth + 1) * sizeof(u32 *));
     terrain->heightmap = (u32 *) malloc(terrain->width * terrain->width * sizeof(u32));
     terrain_generate_heightmap_recursive(terrain, terrain->width_chunks, terrain->approx_heightmaps, 0);
-    INFO("Generating heightmaps took %.2fms. Min height is %u, max height is %u.", (uclock()-time)/1e3,
+    INFO("Generating heightmaps took %.2fms. Min height is %u, max height is %u.", (uclock() - time) / 1e3,
          terrain->approx_heightmaps[terrain->depth][0].min, terrain->approx_heightmaps[terrain->depth][0].max);
 
-    // Then, we call terrain_generate_node for every top level chunk
-    // terrain generate returns a node address/voxel color OR a chunk address/voxel color (bottom level)
-    time = uclock();
-    terrain->rootNode = poolAllocatorAlloc(&terrain->nodePool);
-    Node *root_node = poolAllocatorGet(&terrain->nodePool, terrain->rootNode);
+    time = uclock(); // resetting the timer in order to get the SVO generation time
+
+    /**
+     * Creating the struct that will be used to get back tasty stats from the SVO generation recursive function
+     */
     SvoGenStats stats = (SvoGenStats) {.empty_nodes_per_level=(u32 *) malloc(terrain->depth * sizeof(u32)),
             .mixed_nodes_per_level=(u32 *) malloc(terrain->depth * sizeof(u32)),
             .uniform_nodes_per_level=(u32 *) malloc(terrain->depth * sizeof(u32))};
+    memset(stats.empty_nodes_per_level, 0, terrain->depth * sizeof(u32));
+    memset(stats.mixed_nodes_per_level, 0, terrain->depth * sizeof(u32));
+    memset(stats.uniform_nodes_per_level, 0, terrain->depth * sizeof(u32));
+
+    /**
+     * Creating the root node, and feeding it to the recursive function to create its leaves
+     */
+    terrain->rootNode = poolAllocatorAlloc(&terrain->nodePool);
+    Node *root_node = poolAllocatorGet(&terrain->nodePool, terrain->rootNode);
     terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps, root_node,
                                &stats);
-    for(u16 i = terrain->depth-1; i>0; i--){
+    for (u16 i = terrain->depth - 1; i > 0; i--) {
         INFO("SVO level %u contains %u air nodes, %u uniform non-air nodes and %u mixed nodes.", i,
              stats.empty_nodes_per_level[i], stats.uniform_nodes_per_level[i], stats.mixed_nodes_per_level[i]);
     }
-    INFO("Generating SVO from heightmaps took %.2fms", (uclock()-time)/1e3);
+    free(stats.mixed_nodes_per_level);
+    free(stats.uniform_nodes_per_level);
+    free(stats.empty_nodes_per_level);
+    INFO("Generating SVO from heightmaps took %.2fms", (uclock() - time) / 1e3);
 }
