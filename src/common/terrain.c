@@ -21,19 +21,19 @@ void terrain_init(Terrain *terrain, u32 depth) {
     if (depth <= 0) FATAL("Minimum SVO depth is 1");
 
     // info message
-    terrain->width = CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth);
+    terrain->width = CHUNK_WIDTH * pow(NODE_WIDTH, depth);
     terrain->width_chunks = (u32) pow(NODE_WIDTH, depth);
     terrain->depth = depth;
     char message[256];
     snprintf(message, 256,
-             "SVO depth is set at %u. World is %ux%ux%u blocks", depth, terrain->width, terrain->width,
+             "SVO depth is set at %u. World is %ux%ux%u voxels", depth, terrain->width, terrain->width,
              terrain->width);
     INFO(message);
 
     // allocate ~128 Mo of RAM for each pool
     u32 initialPoolSize = 128 * 1024;
-    poolAllocatorCreate(&terrain->chunkPool, initialPoolSize, sizeof(Chunk), NULL);
-    poolAllocatorCreate(&terrain->nodePool, initialPoolSize, sizeof(Node), NULL);
+    poolAllocatorCreate(&terrain->chunkPool, initialPoolSize, sizeof(u32) * 512, NULL);
+    poolAllocatorCreate(&terrain->nodePool, initialPoolSize, sizeof(u32) * 64, NULL);
 
     // Setup the worldgen noises
     srand(41233125);
@@ -51,7 +51,7 @@ void terrain_init(Terrain *terrain, u32 depth) {
 void terrain_destroy(Terrain *terrain) {
     poolAllocatorDestroy(&terrain->chunkPool);
     poolAllocatorDestroy(&terrain->nodePool);
-    for (int i = 0; i < terrain->depth; i++) {
+    for (int i = 0; i <= terrain->depth; i++) {
         free(terrain->approx_heightmaps[i]);
     }
     free(terrain->approx_heightmaps);
@@ -67,9 +67,9 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
     if (depth == 0) {
         // Create a heightmap at the right size
         heightmaps[0] = (HeightApprox *) malloc(width_chunks * width_chunks * sizeof(HeightApprox));
-        INFO("Generating heightmap of size %ux%u aka %ux%u voxels, with one heightmap entry being one %ux%u chunk.",
-             width_chunks, width_chunks, width_chunks * CHUNK_WIDTH, width_chunks * CHUNK_WIDTH, (u32) CHUNK_WIDTH,
-             (u32) CHUNK_WIDTH);
+        if (!heightmaps[0]) FATAL("Out of memory.");
+        INFO("Generating heightmap of size %ux%u, with one heightmap entry being one %ux%u chunk.",
+             width_chunks, width_chunks, (u32) CHUNK_WIDTH, (u32) CHUNK_WIDTH);
 
         // For every chunk of the map...
         for (u32 cx = 0; cx < width_chunks; cx++) {
@@ -82,8 +82,7 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
                         u32 hy = cy * CHUNK_WIDTH + dy;
                         u32 h = 0.25 * terrain->width +
                                 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
-                        //h = 700;
-                        terrain->heightmap[hx + terrain->width * hy] = h;
+                        terrain->heightmap[hx + (u64) terrain->width * hy] = h;
                         if (h < min) min = h;
                         if (h > max) max = h;
                     }
@@ -94,6 +93,7 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
     } else { // Aggregate fine-grained heightmaps into simplified heightmaps
         // Create a heightmap at the right size
         heightmaps[depth] = (HeightApprox *) malloc(width_chunks * width_chunks * sizeof(HeightApprox));
+        if (!heightmaps[depth]) FATAL("Out of memory.");
         INFO("Generating sub-heightmap of size %ux%u with each heightmap entry corresponding to one %ux%u level %u node.",
              width_chunks, width_chunks, CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth),
              CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth),
@@ -177,6 +177,7 @@ static void terrain_generate(Terrain *terrain) {
     u32 time = uclock();
     terrain->approx_heightmaps = (u32 **) malloc((terrain->depth + 1) * sizeof(u32 *));
     terrain->heightmap = (u32 *) malloc(terrain->width * terrain->width * sizeof(u32));
+    if (!terrain->heightmap | !terrain->approx_heightmaps) FATAL("Out of memory.");
     terrain_generate_heightmap_recursive(terrain, terrain->width_chunks, terrain->approx_heightmaps, 0);
     INFO("Generating heightmaps took %.2fms. Min height is %u, max height is %u.", (uclock() - time) / 1e3,
          terrain->approx_heightmaps[terrain->depth][0].min, terrain->approx_heightmaps[terrain->depth][0].max);
@@ -189,6 +190,8 @@ static void terrain_generate(Terrain *terrain) {
     SvoGenStats stats = (SvoGenStats) {.empty_nodes_per_level=(u32 *) malloc(terrain->depth * sizeof(u32)),
             .mixed_nodes_per_level=(u32 *) malloc(terrain->depth * sizeof(u32)),
             .uniform_nodes_per_level=(u32 *) malloc(terrain->depth * sizeof(u32))};
+    if (!stats.empty_nodes_per_level || !stats.mixed_nodes_per_level || !stats.uniform_nodes_per_level) FATAL(
+            "Out of memory.");
     memset(stats.empty_nodes_per_level, 0, terrain->depth * sizeof(u32));
     memset(stats.mixed_nodes_per_level, 0, terrain->depth * sizeof(u32));
     memset(stats.uniform_nodes_per_level, 0, terrain->depth * sizeof(u32));
@@ -200,10 +203,10 @@ static void terrain_generate(Terrain *terrain) {
     terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps,
                                terrain->root_node_address,
                                &stats);
-    for (u16 i = terrain->depth - 1; i >= 0 && i<terrain->depth; i--) {
+    for (u16 i = terrain->depth - 1; i >= 0 && i < terrain->depth; i--) {
         INFO("SVO level %u contains %u air nodes, %u uniform non-air nodes and %u %s.", i,
              stats.empty_nodes_per_level[i], stats.uniform_nodes_per_level[i], stats.mixed_nodes_per_level[i],
-             i==0?"chunks":"mixed nodes");
+             i == 0 ? "chunks" : "mixed nodes");
     }
     free(stats.mixed_nodes_per_level);
     free(stats.uniform_nodes_per_level);

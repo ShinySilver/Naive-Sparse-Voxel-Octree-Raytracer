@@ -46,7 +46,7 @@ void client_start(void) {
          * Handle camera movements
          */
         glfwPollEvents();
-        camera_update(window, frametime/UCLOCKS_PER_SECONDS);
+        camera_update(window, frametime / UCLOCKS_PER_SECONDS);
 
         glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
@@ -59,7 +59,7 @@ void client_start(void) {
         time = uclock();
         accum += frametime;
         count++;
-        if (accum/UCLOCKS_PER_SECONDS >= 2) {
+        if (accum / UCLOCKS_PER_SECONDS >= 2) {
             INFO("Frame Time: %.2fms", (accum / (float) count / UCLOCKS_PER_SECONDS * 1000.0f));
             accum = 0;
             count = 0;
@@ -68,12 +68,12 @@ void client_start(void) {
     INFO("Client exiting.");
 
     /**
+     * Closing all opened buffers and destroying context since all the GL stuff is above
+     */
+    context_terminate();
+
+    /**
      * Freeing the world data
      */
     terrain_destroy(&terrain);
-
-    /**
-     * Closing all opened buffers and destroying context since all of GL ops are above
-     */
-    context_terminate();
 }

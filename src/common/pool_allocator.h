@@ -1,7 +1,8 @@
 #ifndef SIMPLEVOXELTRACER_POOL_ALLOCATOR_H
 #define SIMPLEVOXELTRACER_POOL_ALLOCATOR_H
 
-#include "cplog.h"
+//#include "cplog.h"
+#include "log.h"
 #include "memory.h"
 typedef struct PoolAllocator
 {
@@ -46,10 +47,12 @@ static void* poolAllocatorAllocPtr(PoolAllocator* poolAllocator)
             if (poolAllocator->ownsMemory)
             {
                 // resize by 2x
+                u32 old_size = poolAllocator->maxSize;
                 poolAllocator->unused += poolAllocator->maxSize;
                 poolAllocator->maxSize *= 2;
                 void* oldMemory = poolAllocator->memory;
-                poolAllocator->memory = _mm_malloc(poolAllocator->maxSize * poolAllocator->unitSize, 64);
+                poolAllocator->memory = _mm_malloc((size_t)poolAllocator->maxSize * poolAllocator->unitSize, 64);
+                if(!poolAllocator->memory) FATAL("Out of memory.");
                 memcpy(poolAllocator->memory, oldMemory, poolAllocator->maxSize / 2 * poolAllocator->unitSize);
                 _mm_free(oldMemory);
 
@@ -58,7 +61,7 @@ static void* poolAllocatorAllocPtr(PoolAllocator* poolAllocator)
             }
             else
             {
-                LOG_ERROR("Pool Allocator is full!");
+                ERROR("Pool Allocator is full!");
                 return NULL;
             }
         }
@@ -105,6 +108,7 @@ static void poolAllocatorCreate(PoolAllocator* allocator, u32 maxCount, u32 item
     else
     {
         allocator->memory = _mm_malloc(((size_t) itemByteSize) * maxCount, 64);
+        if(!allocator->memory) FATAL("Out of memory.");
         allocator->ownsMemory = true;
     }
 
