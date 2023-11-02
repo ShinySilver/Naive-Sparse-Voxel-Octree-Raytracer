@@ -46,7 +46,7 @@ typedef struct Terrain {
     PoolAllocator nodePool;
 
     // pool address of the root node
-    u32 rootNode;
+    u32 root_node_address;
 
     // depth of the tree. 8 means 4**8 = 65 536 voxels aka 4096 MC chunks
     u32 depth;

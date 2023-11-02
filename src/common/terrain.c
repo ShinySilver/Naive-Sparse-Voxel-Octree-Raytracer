@@ -75,13 +75,14 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
         for (u32 cx = 0; cx < width_chunks; cx++) {
             for (u32 cy = 0; cy < width_chunks; cy++) {
                 // Generate a precise heightmap but only keep a min and a max per chunk
-                u32 min, max;
+                u32 min = UINT32_MAX, max = 0;
                 for (u32 dx = 0; dx < CHUNK_WIDTH; dx++) {
                     for (u32 dy = 0; dy < CHUNK_WIDTH; dy++) {
                         u32 hx = cx * CHUNK_WIDTH + dx;
                         u32 hy = cy * CHUNK_WIDTH + dy;
                         u32 h = 0.25 * terrain->width +
                                 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
+                        //h = 700;
                         terrain->heightmap[hx + terrain->width * hy] = h;
                         if (h < min) min = h;
                         if (h > max) max = h;
@@ -101,7 +102,7 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
         // For every chunk of the map...
         for (u32 cx = 0; cx < width_chunks; cx++) {
             for (u32 cy = 0; cy < width_chunks; cy++) {
-                u32 min, max;
+                u32 min = UINT32_MAX, max = 0;
                 for (u32 dx = 0; dx < NODE_WIDTH; dx++) {
                     for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
                         HeightApprox h = heightmaps[depth - 1][cx + dx + (cy + dy) * width_chunks * NODE_WIDTH];
@@ -124,24 +125,26 @@ typedef struct SvoGenStats {
 } SvoGenStats;
 
 static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz, u32 width_chunks, u32 depth,
-                                       HeightApprox **approx_heightmaps, Node *node, SvoGenStats *stats) {
+                                       HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats) {
     depth -= 1;
-
-    if (depth == 0) {
-
-    } else {
-        for (u32 dx = 0; dx < NODE_WIDTH; dx++) {
-            for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
-                HeightApprox height = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
-                for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
-                    if ((cz + dz + 1) * pow(NODE_WIDTH, depth) - 1 < height.min) {
-                        // Node is made of pure stone
-                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = STONE << 24;
-                        stats->uniform_nodes_per_level[depth] += 1;
-                    } else if ((cz + dz) * pow(NODE_WIDTH, depth) <= height.max) {
+    Node *node = poolAllocatorGet(&terrain->nodePool, node_address);;
+    for (u32 dx = 0; dx < NODE_WIDTH; dx++) {
+        for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
+            HeightApprox height = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
+            for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
+                if ((cz + dz + 1) * pow(NODE_WIDTH, depth + 1) - 1 < height.min) {
+                    // Node is made of pure stone
+                    (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = STONE << 24;
+                    stats->uniform_nodes_per_level[depth] += 1;
+                } else if ((cz + dz) * pow(NODE_WIDTH, depth + 1) <= height.max) {
+                    if (depth == 0) {
+                        u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
+                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | chunk_id;
+                        stats->mixed_nodes_per_level[depth] += 1;
+                    } else {
                         // Chunk is made of a mix of air and stone
                         u32 subnode_id = poolAllocatorAlloc(&terrain->nodePool);
-                        Node *new_node = poolAllocatorGet(&terrain->nodePool, subnode_id);
+                        node = poolAllocatorGet(&terrain->nodePool, node_address);
                         (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | subnode_id;
                         stats->mixed_nodes_per_level[depth] += 1;
                         terrain_generate_recursive(terrain,
@@ -151,16 +154,17 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                                                    width_chunks * NODE_WIDTH,
                                                    depth,
                                                    approx_heightmaps,
-                                                   new_node,
+                                                   subnode_id,
                                                    stats);
-                    } else {
-                        // else, node is made of air, do nothing. 0x0 means an air chunk.
-                        stats->empty_nodes_per_level[depth] += 1;
                     }
+                } else {
+                    // else, node is made of air, do nothing. 0x0 means an air chunk.
+                    stats->empty_nodes_per_level[depth] += 1;
                 }
             }
         }
     }
+
 }
 
 static void terrain_generate(Terrain *terrain) {
@@ -192,13 +196,14 @@ static void terrain_generate(Terrain *terrain) {
     /**
      * Creating the root node, and feeding it to the recursive function to create its leaves
      */
-    terrain->rootNode = poolAllocatorAlloc(&terrain->nodePool);
-    Node *root_node = poolAllocatorGet(&terrain->nodePool, terrain->rootNode);
-    terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps, root_node,
+    terrain->root_node_address = poolAllocatorAlloc(&terrain->nodePool);
+    terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps,
+                               terrain->root_node_address,
                                &stats);
-    for (u16 i = terrain->depth - 1; i > 0; i--) {
-        INFO("SVO level %u contains %u air nodes, %u uniform non-air nodes and %u mixed nodes.", i,
-             stats.empty_nodes_per_level[i], stats.uniform_nodes_per_level[i], stats.mixed_nodes_per_level[i]);
+    for (u16 i = terrain->depth - 1; i >= 0 && i<terrain->depth; i--) {
+        INFO("SVO level %u contains %u air nodes, %u uniform non-air nodes and %u %s.", i,
+             stats.empty_nodes_per_level[i], stats.uniform_nodes_per_level[i], stats.mixed_nodes_per_level[i],
+             i==0?"chunks":"mixed nodes");
     }
     free(stats.mixed_nodes_per_level);
     free(stats.uniform_nodes_per_level);
