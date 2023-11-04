@@ -47,6 +47,7 @@ static void* poolAllocatorAllocPtr(PoolAllocator* poolAllocator)
             if (poolAllocator->ownsMemory)
             {
                 // resize by 2x
+                if(poolAllocator->maxSize>UINT32_MAX/2) FATAL("Reached max pool size!");
                 u32 old_size = poolAllocator->maxSize;
                 poolAllocator->unused += poolAllocator->maxSize;
                 poolAllocator->maxSize *= 2;

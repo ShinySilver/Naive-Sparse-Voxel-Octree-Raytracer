@@ -4,6 +4,9 @@
 #include "cpmath.h"
 #include "pool_allocator.h"
 
+#define CHUNK_WIDTH (8)
+#define NODE_WIDTH (2)
+
 /**
  * A voxel is 8 bits, 1 bytes.
  * 8 bits palette
@@ -19,7 +22,7 @@ typedef u8 Voxel;
  * 8x8x8x1 bytes aka FOUR cache lines
  * Contains voxels by value.
  */
-typedef Voxel Chunk[512];
+typedef Voxel Chunk[CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_WIDTH];
 
 /**
  * 4x4x4x4 bytes aka TWO cache line
@@ -28,7 +31,7 @@ typedef Voxel Chunk[512];
  * Since a chunk is 512 bytes, we can address ~ 8 Go RAM worth of chunks
  * If the 8 bit voxel is 0xff, it's an address to a Node or to air rather than a chunk
  */
-typedef u32 Node[64];
+typedef u32 Node[NODE_WIDTH*NODE_WIDTH*NODE_WIDTH];
 
 typedef struct HeightApprox {
     u32 min;
