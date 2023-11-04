@@ -79,6 +79,7 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
                         u32 hy = cy * CHUNK_WIDTH + dy;
                         u32 h = 0.25 * terrain->width +
                                 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
+                        h = 96;
                         terrain->heightmap[hx + (u64) terrain->width * hy] = h;
                         if (h < min) min = h;
                         if (h > max) max = h;
@@ -129,11 +130,11 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
         for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
             HeightApprox height = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
-                if ((cz + dz + 1) * pow(NODE_WIDTH, depth + 1) - 1 < height.min) {
+                if ((cz + dz + 1) * CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth) <= height.min) {
                     // Node is made of pure stone
                     (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = STONE << 24;
                     stats->uniform_nodes_per_level[depth] += 1;
-                } else if ((cz + dz) * pow(NODE_WIDTH, depth + 1) <= height.max) {
+                } else if ((cz + dz) * CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth) <= height.max) {
                     if (depth == 0) {
                         u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
                         node = poolAllocatorGet(&terrain->nodePool, node_address);
