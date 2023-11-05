@@ -16,7 +16,7 @@ void client_start(void) {
      */
     INFO("Generating terrain.");
     Terrain terrain;
-    terrain_init(&terrain, 4);
+    terrain_init(&terrain, 10);
 
     /**
      * Creating context
