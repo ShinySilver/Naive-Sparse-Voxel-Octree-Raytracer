@@ -5,6 +5,7 @@
 #include "common/log.h"
 #include "common/terrain.h"
 #include "cptime.h"
+#include "client/rendering/render.h"
 
 #define UCLOCKS_PER_SECONDS (1e6)
 
@@ -26,14 +27,12 @@ void client_start(void) {
     if (!(window = context_init())) FATAL("Could not initialize context!");
 
     /**
-     * Registering our callbacks into the window
+     * Initializing renderer, passing it the context so it initialize the framebuffer at the right size
      */
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    render_init(window);
 
     /**
-     * Some stats in order to compute framerate
+     * Setup some stats in order to compute framerate
      */
     u32 frametime = 0, accum = 0, count = 0, time = uclock();
 
@@ -48,8 +47,10 @@ void client_start(void) {
         glfwPollEvents();
         camera_update(window, frametime / UCLOCKS_PER_SECONDS);
 
-        glClear(GL_COLOR_BUFFER_BIT);
-        glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
+        /**
+         * Do the actual rendering
+         */
+        render_draw_frame(&terrain);
         glfwSwapBuffers(window);
 
         /**

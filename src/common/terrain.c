@@ -227,6 +227,10 @@ static void terrain_generate(Terrain *terrain) {
              stats.empty_nodes_per_level[i], stats.uniform_nodes_per_level[i], stats.mixed_nodes_per_level[i],
              i == 0 ? "chunks" : "mixed nodes");
     }
+
+    INFO("Chunk pool memory footprint: %.00f Mb", (size_t)terrain->chunkPool.size*terrain->chunkPool.unitSize/1e6);
+    INFO("SVO nodes pool memory footprint: %.00f Mb", (size_t)terrain->nodePool.size*terrain->nodePool.unitSize/1e6);
+
     free(stats.mixed_nodes_per_level);
     free(stats.uniform_nodes_per_level);
     free(stats.empty_nodes_per_level);

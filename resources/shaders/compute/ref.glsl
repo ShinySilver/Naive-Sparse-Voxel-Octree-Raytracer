@@ -6,6 +6,7 @@ layout(rgba8, binding = 0) uniform writeonly image2D outImage;
 
 uniform uvec2 screenSize;
 uniform uvec3 terrainSize;
+uniform uvec3 treeDepth;
 uniform vec3 camPos;
 uniform mat4 viewMat;
 uniform mat4 projMat;

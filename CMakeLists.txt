@@ -15,7 +15,7 @@ set(CMAKE_C_FLAGS_DEBUG
          -Wno-incompatible-pointer-types -Wno-uninitialized -Wno-format-security -Wno-unused-but-set-variable -Wno-unused-variable \
          -Wno-format-zero-length -Wno-unused-parameter -Wno-comment")# -fsanitize=address -static-libasan")
 
-file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c ${CMAKE_CURRENT_SOURCE_DIR}/includes/*.h)
+file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h)
 add_executable(iVy ${SRC_FILES})
 target_compile_options(iVy PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
 
