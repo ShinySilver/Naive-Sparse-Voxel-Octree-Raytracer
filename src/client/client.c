@@ -13,7 +13,7 @@
 void client_start(void) {
     /**
      * Generating world data
-     * Depths: 1 is 64 blocks, 2 is 256, 3 is 1024, 4 is 4096, 5 is 16384, 6 is 65536, 7 is 262144.
+     * Assuming a node width of 2 and a chunk size of 8, a depth 8 means a 2048x2048x2048 world.
      */
     INFO("Generating terrain.");
     Terrain terrain;
