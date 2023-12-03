@@ -8,6 +8,14 @@
 #define NODE_WIDTH (2)
 
 /**
+ * The LOD problem: How am I supposed to do LOD with 8x8x8 chunks?
+ * Octree LOD is easy, but we're not using a pure octree.
+ * Maybe I should "fake" the first two level of LOD.
+ * Maybe I should also take the heightmap into account at higher LOD
+ * That way, mountain lines will not be too ugly
+ */
+
+/**
  * A voxel is 8 bits, 1 bytes.
  * 8 bits palette
  * Because of this format:
@@ -28,6 +36,8 @@ typedef Voxel Chunk[CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_WIDTH];
  * 4x4x4x4 bytes aka TWO cache line
  * Contains 24 bit address to chunks and 8 bit voxel for far chunk LOD color
  * 24 bits means ~ 2**24 chunk address.
+ * If the 8 bit voxel is 0xff, then the LOD color is "air"
+ * Similarly an address of 0xff means no node/chunk
  * Since a chunk is 512 bytes, we can address ~ 8 Go RAM worth of chunks
  * If the 8 bit voxel is 0xff, it's an address to a Node or to air rather than a chunk
  */
@@ -39,10 +49,6 @@ typedef struct HeightApprox {
 } HeightApprox;
 
 typedef struct Terrain {
-    // top level array holding info about each 8x8x8 chunk:
-    // leading 0 : chunk is filled uniformly and the remaining 15 bits are Voxel bits. 16 unused bits.
-    // leading 1 : chunk is not empty and the next 31 bits are the index into the chunk pool
-    // Ox0 : chunk is empty
 
     // pool allocator that holds all 4x4x4 chunks and leaves
     PoolAllocator chunkPool;
@@ -56,11 +62,11 @@ typedef struct Terrain {
     u32 width;
     u32 width_chunks;
 
-    // tmp
+    // heightmap. It's currently unused after world gen, but maybe someday we'll want to play with it.
     u32 *heightmap;
     HeightApprox **approx_heightmaps;
 
-
+    // is set to true when the terrain has changed so its GPU-memory copy is updated.
     bool dirty;
 } Terrain;
 

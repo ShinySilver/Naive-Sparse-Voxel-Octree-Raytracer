@@ -5,7 +5,7 @@
 #include "common/log.h"
 #include "common/terrain.h"
 #include "cptime.h"
-#include "client/rendering/render.h"
+#include "render.h"
 
 #define UCLOCKS_PER_SECONDS (1e6)
 
@@ -17,7 +17,7 @@ void client_start(void) {
      */
     INFO("Generating terrain.");
     Terrain terrain;
-    terrain_init(&terrain, 10);
+    terrain_init(&terrain, 8);
 
     /**
      * Creating context
@@ -35,6 +35,7 @@ void client_start(void) {
      * Setup some stats in order to compute framerate
      */
     u32 frametime = 0, accum = 0, count = 0, time = uclock();
+    char win_title[64];
 
     /**
      * Render loop!
@@ -60,8 +61,10 @@ void client_start(void) {
         time = uclock();
         accum += frametime;
         count++;
-        if (accum / UCLOCKS_PER_SECONDS >= 2) {
-            INFO("Frame Time: %.2fms", (accum / (float) count / UCLOCKS_PER_SECONDS * 1000.0f));
+        if (accum / UCLOCKS_PER_SECONDS >= 1) {
+            float frame_time = (accum / (float) count / UCLOCKS_PER_SECONDS * 1000.0f);
+            snprintf(win_title, 64, "iVy - %0.2fms - %0.2fFPS", frame_time, 1e3/frame_time);
+            glfwSetWindowTitle(window, win_title);
             accum = 0;
             count = 0;
         }
@@ -71,6 +74,7 @@ void client_start(void) {
     /**
      * Closing all opened buffers and destroying context since all the GL stuff is above
      */
+    render_terminate();
     context_terminate();
 
     /**

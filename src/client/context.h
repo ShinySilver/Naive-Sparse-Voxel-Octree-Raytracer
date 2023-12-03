@@ -4,7 +4,9 @@
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
 
-#define WIN_VSYNC true
+// VSync can be toggled on here.
+// Note that vsync make frame timing untrustworthy.
+#define WIN_VSYNC false
 
 extern bool context_heat_map_mode,
             context_depth_map_mode,
@@ -14,10 +16,3 @@ extern bool context_heat_map_mode,
 
 GLFWwindow *context_init(void);
 void context_terminate(void);
-
-void context_set_fullscreen(bool);
-void context_set_vsync(bool);
-void context_set_max_framerate(int);
-
-int context_get_width(void);
-int context_get_height(void);

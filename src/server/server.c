@@ -10,5 +10,5 @@ void server_stop(void){
 }
 
 void server_join(void){
-
+    // lol
 }

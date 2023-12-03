@@ -46,6 +46,11 @@ include_directories(libraries/glad/include)
 add_library(glad STATIC libraries/glad/src/glad.c)
 target_link_libraries(iVy glad)
 
+# gllib
+include_directories(libraries/gllib)
+add_library(gllib STATIC libraries/gllib/gllib.c)
+target_link_libraries(iVy gllib)
+
 # GLFW
 include_directories("libraries/glfw-3.3.2/include")
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
