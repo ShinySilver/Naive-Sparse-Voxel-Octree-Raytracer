@@ -2,7 +2,7 @@
 #include "context.h"
 #include "common/log.h"
 
-vec3 camera_pos = (vec3) {-64, 64, 64};
+vec3 camera_pos = (vec3) {0, 0, 0};
 vec3 camera_forward = (vec3) {0.5, 0.5, 0};
 
 void camera_update(GLFWwindow *window, float deltaTime) {

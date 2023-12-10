@@ -38,8 +38,8 @@ void terrain_init(Terrain *terrain, u32 depth) {
 
     // allocate ~128 Mo of RAM for each pool
     u32 initialPoolSize = 128 * 1024;
-    poolAllocatorCreate(&terrain->chunkPool, initialPoolSize, sizeof(u32) * 512, NULL);
-    poolAllocatorCreate(&terrain->nodePool, initialPoolSize, sizeof(u32) * 64, NULL);
+    poolAllocatorCreate(&terrain->chunkPool, initialPoolSize, sizeof(Chunk), NULL);
+    poolAllocatorCreate(&terrain->nodePool, initialPoolSize, sizeof(Node), NULL);
 
     // Setup the worldgen noises
     srand(41233125);
@@ -97,6 +97,7 @@ static void terrain_generate(Terrain *terrain) {
      * Creating the root node, and feeding it to the recursive function to create its leaves
      */
     terrain->root_node_address = poolAllocatorAlloc(&terrain->nodePool);
+    INFO("%p", poolAllocatorGet(&terrain->nodePool, terrain->root_node_address));
     terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps,
                                terrain->root_node_address,
                                &stats);

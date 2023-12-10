@@ -18,6 +18,8 @@ void client_start(void) {
     INFO("Generating terrain.");
     Terrain terrain;
     terrain_init(&terrain, 8);
+    camera_pos = (vec3){-0.5*terrain.width,1.5*terrain.width, -0.5*terrain.width};
+    camera_forward = (vec3) {0.5, -0.5, 0.5};
 
     /**
      * Creating context

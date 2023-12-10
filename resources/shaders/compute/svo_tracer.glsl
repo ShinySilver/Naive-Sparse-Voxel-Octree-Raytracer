@@ -1,8 +1,8 @@
 #version 460
 
-layout(local_size_x = 8,  local_size_y = 8) in;
+layout (local_size_x = 8, local_size_y = 8) in;
 
-layout(rgba8, binding = 0) uniform writeonly image2D outImage;
+layout (rgba8, binding = 0) uniform writeonly image2D outImage;
 
 uniform uvec2 screenSize;
 uniform uvec3 terrainSize;
@@ -11,12 +11,15 @@ uniform vec3 camPos;
 uniform mat4 viewMat;
 uniform mat4 projMat;
 
-layout(std430, binding = 0) readonly buffer node_pool
+#define NODE_WIDTH 2
+#define NODE_SIZE NODE_WIDTH * NODE_WIDTH * NODE_WIDTH
+
+layout (std430, binding = 0) readonly buffer node_pool
 {
     uint nodePool[];
 };
 
-layout(std430, binding = 1) readonly buffer chunk_pool
+layout (std430, binding = 1) readonly buffer chunk_pool
 {
     uint chunkPool[];
 };
@@ -24,9 +27,9 @@ layout(std430, binding = 1) readonly buffer chunk_pool
 vec3 getRayDir(ivec2 screenPos)
 {
     vec2 screenSpace = (screenPos + vec2(0.5)) / vec2(screenSize);
-	vec4 clipSpace = vec4(screenSpace * 2.0f - 1.0f, -1.0, 1.0);
-	vec4 eyeSpace = vec4(vec2(inverse(projMat) * clipSpace), -1.0, 0.0);
-	return normalize(vec3(inverse(viewMat) * eyeSpace));
+    vec4 clipSpace = vec4(screenSpace * 2.0f - 1.0f, -1.0, 1.0);
+    vec4 eyeSpace = vec4(vec2(inverse(projMat) * clipSpace), -1.0, 0.0);
+    return normalize(vec3(inverse(viewMat) * eyeSpace));
 }
 
 float AABBIntersect(vec3 bmin, vec3 bmax, vec3 orig, vec3 invdir)
@@ -41,7 +44,7 @@ float AABBIntersect(vec3 bmin, vec3 bmax, vec3 orig, vec3 invdir)
     float tmax = min(vmax.x, min(vmax.y, vmax.z));
 
     if (!(tmax < tmin) && (tmax >= 0))
-        return max(0, tmin);
+    return max(0, tmin);
     return -1;
 }
 
@@ -49,7 +52,7 @@ void main()
 {
     // make sure current thread is inside the window bounds
     if (any(greaterThanEqual(gl_GlobalInvocationID.xy, screenSize)))
-        return;
+    return;
 
     // calc ray direction for current pixel
     vec3 rayDir = getRayDir(ivec2(gl_GlobalInvocationID.xy));
@@ -65,9 +68,48 @@ void main()
 
     // if the ray intersect the terrain, raytrace
     vec3 color = vec3(0.69, 0.88, 0.90); // this is the sky color
+
+    // colors used for debuging
+    vec3 colors[] = {
+    vec3(1.00, 0.40, 0.40), // UNDEFINED
+    vec3(0.69, 0.88, 0.90), // AIR
+    vec3(0.33, 0.33, 0.33), // STONE
+    vec3(0.42, 0.32, 0.25), // DIRT
+    vec3(0.30, 0.39, 0.31)  // GRASS
+    };
+
     if (intersect >= 0) {
-        // do the raytracing here
-        // TBD
+        uint depth = 0;
+
+        // at any time, node_width = terrain_width / NODE_WIDTH**depth
+        uint node_width = terrainSize.x;
+
+        // at any time, the top-most stack address is stack[depth]
+        uint stack[12];
+
+        // index of the current node in the pool
+        uint current_node = 0;
+
+        // setting the stack to the starting pos of the ray
+        do {
+            depth += 1;
+            node_width /= NODE_WIDTH;
+            rayPos /= node_width;
+            stack[depth] = current_node;
+            uint tmp = nodePool[current_node * NODE_SIZE
+            + uint(rayPos.x)
+            + uint(rayPos.y) * NODE_WIDTH
+            + uint(rayPos.z) * NODE_WIDTH * NODE_WIDTH];
+            current_node = tmp & 0x00ffffffu;
+
+            // we only support 4 colors. If we receive an unsupported color, print red.
+            if (tmp>>24 > 4) {
+                color.xyz = colors[0].xyz;
+            } else color.xyz = colors[tmp>>24].xyz;
+        } while (current_node != 0 && depth < 7);
+
+        // slightly coloring the sky in the octree
+        //color.xyz *= 1 - 0.05*depth;
     }
 
     // output color to texture
