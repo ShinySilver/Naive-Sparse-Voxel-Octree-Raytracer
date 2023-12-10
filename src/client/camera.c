@@ -5,12 +5,17 @@
 vec3 camera_pos = (vec3) {0, 0, 0};
 vec3 camera_forward = (vec3) {0.5, 0.5, 0};
 
+#define CAMERA_BASE_SPEED (20)
+#define CAMERA_FAST_SPEED (500)
+#define CAMERA_SPEED_MULTIPLIER (10)
+#define CAMERA_MOUSE_SENSITIVITY (5)
+
 void camera_update(GLFWwindow *window, float deltaTime) {
     static float accum = 0;
     static bool has_recently_moved_keyboard = false, has_recently_moved_mouse = false;
     accum += deltaTime;
 
-    float speed = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 500 : 20;
+    float speed = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? CAMERA_FAST_SPEED * CAMERA_SPEED_MULTIPLIER : CAMERA_BASE_SPEED * CAMERA_SPEED_MULTIPLIER;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         has_recently_moved_keyboard = true;
         camera_pos = add(camera_pos, mul(camera_forward, deltaTime * speed));
@@ -44,12 +49,12 @@ void camera_update(GLFWwindow *window, float deltaTime) {
 
         if (dX != 0) {
             has_recently_moved_mouse = true;
-            camera_forward = normalize(add(camera_forward, mul(right, (float) -dX / 1000.0f)));
+            camera_forward = normalize(add(camera_forward, mul(right, (float) dX * CAMERA_MOUSE_SENSITIVITY / 1000.0f)));
         }
 
         if (dY != 0) {
             has_recently_moved_mouse = true;
-            camera_forward = normalize(add(camera_forward, mul(((vec3) {0, 1, 0}), (float) dY / 1000.0f)));
+            camera_forward = normalize(add(camera_forward, mul(((vec3) {0, 1, 0}), (float) -dY * CAMERA_MOUSE_SENSITIVITY *2 / 1000.0f)));
         }
     }
 

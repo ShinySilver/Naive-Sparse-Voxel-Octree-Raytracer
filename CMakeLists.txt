@@ -13,7 +13,7 @@ set(CMAKE_C_FLAGS_DEBUG
         "-g3  -O0 -Wall -Werror -Wshadow -Warray-bounds -Wcast-align=strict -Wstrict-prototypes -Wmissing-prototypes \
          -Wwrite-strings -Winit-self -Wold-style-definition -Wno-missing-braces -Wno-unused-function \
          -Wno-incompatible-pointer-types -Wno-uninitialized -Wno-format-security -Wno-unused-but-set-variable -Wno-unused-variable \
-         -Wno-format-zero-length -Wno-unused-parameter -Wno-comment")# -fsanitize=address -static-libasan")
+         -Wno-format-zero-length -Wno-unused-parameter -Wno-comment -fsanitize=address -static-libasan")
 
 file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h)
 add_executable(iVy ${SRC_FILES})

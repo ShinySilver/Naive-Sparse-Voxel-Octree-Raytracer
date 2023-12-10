@@ -94,19 +94,23 @@ void main()
         do {
             depth += 1;
             node_width /= NODE_WIDTH;
-            rayPos /= node_width;
             stack[depth] = current_node;
+            uvec3 r = uvec3(rayPos/node_width);
             uint tmp = nodePool[current_node * NODE_SIZE
-            + uint(rayPos.x)
-            + uint(rayPos.y) * NODE_WIDTH
-            + uint(rayPos.z) * NODE_WIDTH * NODE_WIDTH];
-            current_node = tmp & 0x00ffffffu;
+            + r.x
+            + r.z * NODE_WIDTH
+            + r.y * NODE_WIDTH * NODE_WIDTH];
+            rayPos = rayPos - r*node_width;
+            current_node = (tmp & 0x00ffffffu);
 
             // we only support 4 colors. If we receive an unsupported color, print red.
-            if (tmp>>24 > 4) {
-                color.xyz = colors[0].xyz;
-            } else color.xyz = colors[tmp>>24].xyz;
+            uint color_code = (tmp>>24);
+            if (color_code > 4) {
+                color = vec3(1.0, 1.0, 1.0);
+            } else color.xyz = colors[color_code].xyz;
         } while (current_node != 0 && depth < 7);
+
+        //if(current_node==0)color.xyz = colors[0].xyz;
 
         // slightly coloring the sky in the octree
         //color.xyz *= 1 - 0.05*depth;

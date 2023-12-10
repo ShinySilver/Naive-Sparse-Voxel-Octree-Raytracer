@@ -21,7 +21,7 @@ static fnl_state noiseGen2D;
 static void terrain_generate(Terrain *terrain);
 static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chunks, HeightApprox **heightmaps, u32 depth);
 static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz, u32 width_chunks, u32 depth, HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats);
-static void terrain_generate_chunk(Terrain *pTerrain, u32 x, u32 y, u32 z, Node (*node));
+static void terrain_generate_chunk(Terrain *pTerrain, u32 x, u32 y, u32 z, Chunk (*node));
 
 void terrain_init(Terrain *terrain, u32 depth) {
     if (depth <= 0) FATAL("Minimum SVO depth is 1");
@@ -97,7 +97,7 @@ static void terrain_generate(Terrain *terrain) {
      * Creating the root node, and feeding it to the recursive function to create its leaves
      */
     terrain->root_node_address = poolAllocatorAlloc(&terrain->nodePool);
-    INFO("%p", poolAllocatorGet(&terrain->nodePool, terrain->root_node_address));
+    //INFO("%p", poolAllocatorGet(&terrain->nodePool, terrain->root_node_address));
     terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps,
                                terrain->root_node_address,
                                &stats);
@@ -138,6 +138,7 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
                         u32 h = 0.25 * terrain->width +
                                 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
                         //h = 96;
+                        h=min(hx, hy);
                         terrain->heightmap[hx + (u64) terrain->width * hy] = h;
                         if (h < min) min = h;
                         if (h > max) max = h;
@@ -183,30 +184,34 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
             HeightApprox height = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
                 u32 coordinate_multiplier = CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth);
-                if ((cz + dz + 1) * coordinate_multiplier <= height.min) {
-                    // Node is made of pure stone
+                if ((cz + dz + 1) * coordinate_multiplier <= height.min) { // Node is made of pure stone
                     (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = STONE << 24;
                     stats->uniform_nodes_per_level[depth] += 1;
-                } else if ((cz + dz) * coordinate_multiplier <= height.max) {
-                    if (depth == 0) {
-                        u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
-                        node = poolAllocatorGet(&terrain->nodePool, node_address);
-                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | chunk_id;
-                        stats->mixed_nodes_per_level[depth] += 1;
-                    } else {
-                        // Chunk is made of a mix of air and stone
-                        u32 subnode_id = poolAllocatorAlloc(&terrain->nodePool);
-                        Node *new_node = poolAllocatorGet(&terrain->nodePool, subnode_id);
+                } else if ((cz + dz) * coordinate_multiplier <= height.max) { // Node is mixed
+                    if (depth == 0) { // surprise! it's not a node, it's a chunk!
 
-                        /**
-                         * Actual chunk gen is in the terrain_generate_chunk function.
-                         * We'll use memset to roughly fill the chunk with AIR, and then place block per block.
-                         */
+                        // since it's a chunk, we allocate from the chunk pool
+                        u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
+
+                        // then update the current node address. In this specific case, it's probably not necessary, oh well.
+                        node = poolAllocatorGet(&terrain->nodePool, node_address);
+
+                        // placing the address of the newly create chunk in its parent node
+                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | (chunk_id & 0x0fff);
+
+                        // actual chunk gen is here, in the terrain_generate_chunk function.
                         terrain_generate_chunk(terrain,
                                                (cx + dx) * coordinate_multiplier,
                                                (cy + dy) * coordinate_multiplier,
                                                (cz + dz) * coordinate_multiplier,
-                                               new_node);
+                                               poolAllocatorGet(&terrain->chunkPool, chunk_id));
+
+                        // at last updating the stats...
+                        stats->mixed_nodes_per_level[depth] += 1;
+                    } else { // oh well, nvm it's indeed a node, made from a mix of stone and air
+                        u32 subnode_id = poolAllocatorAlloc(&terrain->nodePool);
+                        node = poolAllocatorGet(&terrain->nodePool, node_address);
+                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | (subnode_id & 0x0fff);
 
                         stats->mixed_nodes_per_level[depth] += 1;
                         terrain_generate_recursive(terrain,
@@ -218,11 +223,10 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                                                    approx_heightmaps,
                                                    subnode_id,
                                                    stats);
-                        node = poolAllocatorGet(&terrain->nodePool, node_address);
-                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | subnode_id;
                     }
                 } else {
                     // else, node is made of air, do nothing. 0x0 means an air chunk.
+                    (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = AIR<<24;
                     stats->empty_nodes_per_level[depth] += 1;
                 }
             }
@@ -231,6 +235,6 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
 
 }
 
-static void terrain_generate_chunk(Terrain *pTerrain, u32 x, u32 y, u32 z, Node (*node)) {
+static void terrain_generate_chunk(Terrain *pTerrain, u32 x, u32 y, u32 z, Chunk (*chunk)) {
 
 }
