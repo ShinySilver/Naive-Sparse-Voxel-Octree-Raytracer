@@ -103,14 +103,16 @@ void main()
             rayPos = rayPos - r*node_width;
             current_node = (tmp & 0x00ffffffu);
 
-            // we only support 4 colors. If we receive an unsupported color, print red.
+            // we only support 4 colors. If we receive an unsupported color, print white.
             uint color_code = (tmp>>24);
             if (color_code > 4) {
                 color = vec3(1.0, 1.0, 1.0);
             } else color.xyz = colors[color_code].xyz;
         } while (current_node != 0 && depth < 7);
 
-        //if(current_node==0)color.xyz = colors[0].xyz;
+        if(current_node!=0){
+            //color.xyz = colors[0].xyz;
+        }
 
         // slightly coloring the sky in the octree
         //color.xyz *= 1 - 0.05*depth;

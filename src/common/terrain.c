@@ -19,8 +19,11 @@ typedef struct SvoGenStats {
 static fnl_state noiseGen2D;
 
 static void terrain_generate(Terrain *terrain);
+
 static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chunks, HeightApprox **heightmaps, u32 depth);
+
 static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz, u32 width_chunks, u32 depth, HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats);
+
 static void terrain_generate_chunk(Terrain *pTerrain, u32 x, u32 y, u32 z, Chunk (*node));
 
 void terrain_init(Terrain *terrain, u32 depth) {
@@ -107,8 +110,8 @@ static void terrain_generate(Terrain *terrain) {
              i == 0 ? "chunks" : "mixed nodes");
     }
 
-    INFO("Chunk pool memory footprint: %.00f Mb", (size_t)terrain->chunkPool.size*terrain->chunkPool.unitSize/1e6);
-    INFO("SVO nodes pool memory footprint: %.00f Mb", (size_t)terrain->nodePool.size*terrain->nodePool.unitSize/1e6);
+    INFO("Chunk pool memory footprint: %.00f Mb", (size_t) terrain->chunkPool.size * terrain->chunkPool.unitSize / 1e6);
+    INFO("SVO nodes pool memory footprint: %.00f Mb", (size_t) terrain->nodePool.size * terrain->nodePool.unitSize / 1e6);
 
     free(stats.mixed_nodes_per_level);
     free(stats.uniform_nodes_per_level);
@@ -137,8 +140,8 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
                         u32 hy = cy * CHUNK_WIDTH + dy;
                         u32 h = 0.25 * terrain->width +
                                 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
-                        //h = 96;
-                        h=min(hx, hy);
+                        //h = 18;
+                        h = CHUNK_WIDTH + min(hx, hy);
                         terrain->heightmap[hx + (u64) terrain->width * hy] = h;
                         if (h < min) min = h;
                         if (h > max) max = h;
@@ -179,15 +182,34 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                                        HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats) {
     depth -= 1;
     Node *node = poolAllocatorGet(&terrain->nodePool, node_address);
+    u32 coordinate_multiplier = (u32) pow(NODE_WIDTH, depth);
+
+    // For every subnode in the node...
     for (u32 dx = 0; dx < NODE_WIDTH; dx++) {
         for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
-            HeightApprox height = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
+
+            // We cache the height for the whole vertical columne
+            HeightApprox height;// = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
+
+            // we override the height, bc we don't trust it
+            height = (HeightApprox) {.min=125, .max=130};
+
+            // For every subnode in the subnode column...
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
-                u32 coordinate_multiplier = CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth);
-                if ((cz + dz + 1) * coordinate_multiplier <= height.min) { // Node is made of pure stone
+
+                // If the top block height of the chunk is inferior to the min height for the chunk, it's made out of stone
+                if (CHUNK_WIDTH * (cz + (dz + 1) * coordinate_multiplier) <= height.min) {
                     (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = STONE << 24;
                     stats->uniform_nodes_per_level[depth] += 1;
-                } else if ((cz + dz) * coordinate_multiplier <= height.max) { // Node is mixed
+
+                }
+                    // If the bottom block height of the chunk is superior to the max height for the chunk, it's pure air.
+                else if (CHUNK_WIDTH * (cz + dz * coordinate_multiplier) > height.max) {
+                    (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = AIR << 24;
+                    stats->empty_nodes_per_level[depth] += 1;
+                }
+                    // else, it's not pure air nor is it pure stone, it's a mixed chunk.
+                else {
                     if (depth == 0) { // surprise! it's not a node, it's a chunk!
 
                         // since it's a chunk, we allocate from the chunk pool
@@ -214,20 +236,22 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                         (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | (subnode_id & 0x0fff);
 
                         stats->mixed_nodes_per_level[depth] += 1;
+                        /**
+                         * terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps,
+                               terrain->root_node_address,
+                               &stats);
+                         */
                         terrain_generate_recursive(terrain,
-                                                   (cx + dx) * NODE_WIDTH,
-                                                   (cy + dy) * NODE_WIDTH,
-                                                   (cz + dz) * NODE_WIDTH,
+                                                   CHUNK_WIDTH * (cx + dx * coordinate_multiplier),
+                                                   CHUNK_WIDTH * (cy + dy * coordinate_multiplier),
+                                                   CHUNK_WIDTH * (cz + dz * coordinate_multiplier),
                                                    width_chunks * NODE_WIDTH,
                                                    depth,
                                                    approx_heightmaps,
                                                    subnode_id,
                                                    stats);
+                        node = poolAllocatorGet(&terrain->nodePool, node_address);
                     }
-                } else {
-                    // else, node is made of air, do nothing. 0x0 means an air chunk.
-                    (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = AIR<<24;
-                    stats->empty_nodes_per_level[depth] += 1;
                 }
             }
         }
