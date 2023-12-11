@@ -95,7 +95,7 @@ void main()
             depth += 1;
             node_width /= NODE_WIDTH;
             stack[depth] = current_node;
-            uvec3 r = uvec3(rayPos/node_width);
+            uvec3 r = max(min(uvec3(rayPos/node_width), 1), 0);
             uint tmp = nodePool[current_node * NODE_SIZE
             + r.x
             + r.z * NODE_WIDTH
@@ -108,7 +108,7 @@ void main()
             if (color_code > 4) {
                 color = vec3(1.0, 1.0, 1.0);
             } else color.xyz = colors[color_code].xyz;
-        } while (current_node != 0 && depth < 7);
+        } while (current_node != 0 && depth < 8);
 
         if(current_node!=0){
             //color.xyz = colors[0].xyz;

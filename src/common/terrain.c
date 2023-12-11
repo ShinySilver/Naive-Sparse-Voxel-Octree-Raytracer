@@ -22,7 +22,7 @@ static void terrain_generate(Terrain *terrain);
 
 static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chunks, HeightApprox **heightmaps, u32 depth);
 
-static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz, u32 width_chunks, u32 depth, HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats);
+static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz, u32 depth, HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats);
 
 static void terrain_generate_chunk(Terrain *pTerrain, u32 x, u32 y, u32 z, Chunk (*node));
 
@@ -101,7 +101,7 @@ static void terrain_generate(Terrain *terrain) {
      */
     terrain->root_node_address = poolAllocatorAlloc(&terrain->nodePool);
     //INFO("%p", poolAllocatorGet(&terrain->nodePool, terrain->root_node_address));
-    terrain_generate_recursive(terrain, 0, 0, 0, NODE_WIDTH, terrain->depth, terrain->approx_heightmaps,
+    terrain_generate_recursive(terrain, 0, 0, 0, terrain->depth, terrain->approx_heightmaps,
                                terrain->root_node_address,
                                &stats);
     for (u16 i = terrain->depth - 1; i >= 0 && i < terrain->depth; i--) {
@@ -178,11 +178,11 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
     terrain_generate_heightmap_recursive(terrain, width_chunks / NODE_WIDTH, heightmaps, depth + 1);
 }
 
-static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz, u32 width_chunks, u32 depth,
+static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz, u32 depth,
                                        HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats) {
     depth -= 1;
     Node *node = poolAllocatorGet(&terrain->nodePool, node_address);
-    u32 coordinate_multiplier = (u32) pow(NODE_WIDTH, depth);
+    u32 subnode_width = (u32) pow(NODE_WIDTH, depth)*CHUNK_WIDTH;
 
     // For every subnode in the node...
     for (u32 dx = 0; dx < NODE_WIDTH; dx++) {
@@ -192,19 +192,19 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
             HeightApprox height;// = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
 
             // we override the height, bc we don't trust it
-            height = (HeightApprox) {.min=125, .max=130};
+            height = (HeightApprox) {.min=10, .max=12};
 
             // For every subnode in the subnode column...
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
 
                 // If the top block height of the chunk is inferior to the min height for the chunk, it's made out of stone
-                if (CHUNK_WIDTH * (cz + (dz + 1) * coordinate_multiplier) <= height.min) {
+                if (cz + (dz+1) * subnode_width-1 <= height.min) {
                     (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = STONE << 24;
                     stats->uniform_nodes_per_level[depth] += 1;
 
                 }
                     // If the bottom block height of the chunk is superior to the max height for the chunk, it's pure air.
-                else if (CHUNK_WIDTH * (cz + dz * coordinate_multiplier) > height.max) {
+                else if (cz + dz * subnode_width > height.max) {
                     (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = AIR << 24;
                     stats->empty_nodes_per_level[depth] += 1;
                 }
@@ -223,9 +223,9 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
 
                         // actual chunk gen is here, in the terrain_generate_chunk function.
                         terrain_generate_chunk(terrain,
-                                               (cx + dx) * coordinate_multiplier,
-                                               (cy + dy) * coordinate_multiplier,
-                                               (cz + dz) * coordinate_multiplier,
+                                               cx + dx * subnode_width,
+                                               cy + dy * subnode_width,
+                                               cz + dz * subnode_width,
                                                poolAllocatorGet(&terrain->chunkPool, chunk_id));
 
                         // at last updating the stats...
@@ -242,10 +242,9 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                                &stats);
                          */
                         terrain_generate_recursive(terrain,
-                                                   CHUNK_WIDTH * (cx + dx * coordinate_multiplier),
-                                                   CHUNK_WIDTH * (cy + dy * coordinate_multiplier),
-                                                   CHUNK_WIDTH * (cz + dz * coordinate_multiplier),
-                                                   width_chunks * NODE_WIDTH,
+                                                   cx + dx * subnode_width,
+                                                   cy + dy * subnode_width,
+                                                   cz + dz * subnode_width,
                                                    depth,
                                                    approx_heightmaps,
                                                    subnode_id,
