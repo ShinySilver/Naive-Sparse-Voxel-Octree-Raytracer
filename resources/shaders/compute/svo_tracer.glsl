@@ -69,7 +69,7 @@ void main()
     // if the ray intersect the terrain, raytrace
     vec3 color = vec3(0.69, 0.88, 0.90); // this is the sky color
 
-    // colors used for debuging
+    // a few base colors, indexes are refering to materials.h
     vec3 colors[] = {
     vec3(1.00, 0.40, 0.40), // UNDEFINED
     vec3(0.69, 0.88, 0.90), // AIR
@@ -95,7 +95,7 @@ void main()
             depth += 1;
             node_width /= NODE_WIDTH;
             stack[depth] = current_node;
-            uvec3 r = max(min(uvec3(rayPos/node_width), 1), 0);
+            uvec3 r = uvec3(rayPos/node_width);
             uint tmp = nodePool[current_node * NODE_SIZE
             + r.x
             + r.z * NODE_WIDTH
@@ -108,14 +108,11 @@ void main()
             if (color_code > 4) {
                 color = vec3(1.0, 1.0, 1.0);
             } else color.xyz = colors[color_code].xyz;
-        } while (current_node != 0 && depth < 8);
+        } while (current_node != 0 && depth < 32);
 
         if(current_node!=0){
-            //color.xyz = colors[0].xyz;
+            color.xyz = colors[0].xyz;
         }
-
-        // slightly coloring the sky in the octree
-        //color.xyz *= 1 - 0.05*depth;
     }
 
     // output color to texture

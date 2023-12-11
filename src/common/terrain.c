@@ -189,10 +189,11 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
         for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
 
             // We cache the height for the whole vertical columne
-            HeightApprox height;// = approx_heightmaps[depth][cx + dx + (cy + dy) * width_chunks];
+            HeightApprox height;// = approx_heightmaps[depth][(cx + dx*subnode_width)/CHUNK_WIDTH + (cy + dy*subnode_width)/CHUNK_WIDTH];
 
             // we override the height, bc we don't trust it
-            height = (HeightApprox) {.min=10, .max=12};
+            //height = (HeightApprox) {.min=10, .max=12};
+            height = (HeightApprox){.min=max(cx, cy), .max=max(cx, cy)+subnode_width};
 
             // For every subnode in the subnode column...
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
@@ -219,7 +220,8 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                         node = poolAllocatorGet(&terrain->nodePool, node_address);
 
                         // placing the address of the newly create chunk in its parent node
-                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | (chunk_id & 0x0fff);
+                        // For now, we are not generating the actual chunk nor passing the actual chunk address
+                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24); // | (chunk_id & 0x0fff);
 
                         // actual chunk gen is here, in the terrain_generate_chunk function.
                         terrain_generate_chunk(terrain,
@@ -233,7 +235,10 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                     } else { // oh well, nvm it's indeed a node, made from a mix of stone and air
                         u32 subnode_id = poolAllocatorAlloc(&terrain->nodePool);
                         node = poolAllocatorGet(&terrain->nodePool, node_address);
-                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | (subnode_id & 0x0fff);
+
+
+                        if(subnode_id & 0xff000000) FATAL("SVO node pool index overflow!")
+                        (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | (subnode_id & 0x00ffffff);
 
                         stats->mixed_nodes_per_level[depth] += 1;
                         /**
