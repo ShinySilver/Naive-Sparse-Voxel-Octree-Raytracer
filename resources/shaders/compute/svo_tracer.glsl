@@ -90,6 +90,9 @@ void main()
         // index of the current node in the pool
         uint current_node = 0;
 
+        // color code of the last valid node
+        uint color_code;
+
         // setting the stack to the starting pos of the ray
         do {
             depth += 1;
@@ -104,15 +107,23 @@ void main()
             current_node = (tmp & 0x00ffffffu);
 
             // we only support 4 colors. If we receive an unsupported color, print white.
-            uint color_code = (tmp>>24);
-            if (color_code > 4) {
-                color = vec3(1.0, 1.0, 1.0);
-            } else color.xyz = colors[color_code].xyz;
+            color_code = (tmp>>24);
         } while (current_node != 0 && depth < 32);
 
-        if(current_node!=0){
-            color.xyz = colors[0].xyz;
-        }
+        // dda in the nodes of the octree
+        // while le step nous renvoie de l'air
+        // |  on trouve la direction du step
+        // |  tant que on ne peut pas juste step de 1 dans le noeud courant dans la direction demandée
+        // |  | on remonte de 1 dans l'arbre
+        // |  puis on refait le do-while plus haut en redescendant :)
+
+        // TODO implement the above algorithm
+        // TODO support chunk leafs (I'm very scared)
+
+        // ensuring the color code is valid
+        if (color_code > 4) {
+            color = vec3(1.0, 1.0, 1.0);
+        } else color.xyz = colors[color_code].xyz;
     }
 
     // output color to texture
