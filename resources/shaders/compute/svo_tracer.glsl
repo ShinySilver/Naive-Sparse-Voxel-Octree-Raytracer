@@ -34,11 +34,13 @@ vec3(0.30, 0.39, 0.31)  // GRASS
 };
 vec3 debug_colors[] = {
 vec3(1.0, 0.5, 0.5),
-vec3(0.8, 0., 0.),
+vec3(0.8, 0.25, 0.25),
 vec3(0.5, 1., 0.5),
 vec3(0., 0.8, 0.),
+vec3(0.25, 0.8, 0.25),
 vec3(0.5, 0.5, 1.),
 vec3(0., 0., 0.8),
+vec3(0.25, 0.25, 0.8),
 };
 
 vec3 getRayDir(ivec2 screenPos)
@@ -158,12 +160,13 @@ void main()
         // ensuring the color code is valid
         if (color_code >= colors.length()) {
             color.xyz = colors[0].xyz;
-        } else {
+        } else if(color_code>1){
+            // using per-node color to debug the octree
+            // the whole "else-if" block can be commented to restore the original colors
+            color.xyz = debug_colors[previous_node % debug_colors.length()].xyz;
+        }else{
             // setting the pixel color using the color table
-            //color.xyz = colors[color_code].xyz;
-
-            // .. or using per-node color to debug the octree
-            color.xyz = debug_colors[(previous_node >> 1) % debug_colors.length()].xyz;
+            color.xyz = colors[color_code].xyz;
         }
     }
 
