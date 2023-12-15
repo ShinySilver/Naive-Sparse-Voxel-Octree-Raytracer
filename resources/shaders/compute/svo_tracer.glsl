@@ -24,6 +24,23 @@ layout (std430, binding = 1) readonly buffer chunk_pool
     uint chunkPool[];
 };
 
+// voxel palette. it mirrors materials.h
+vec3 colors[] = {
+vec3(1.00, 0.40, 0.40), // UNDEFINED
+vec3(0.69, 0.88, 0.90), // AIR
+vec3(0.33, 0.33, 0.33), // STONE
+vec3(0.42, 0.32, 0.25), // DIRT
+vec3(0.30, 0.39, 0.31)  // GRASS
+};
+vec3 debug_colors[] = {
+vec3(1.0, 0.5, 0.5),
+vec3(0.8, 0., 0.),
+vec3(0.5, 1., 0.5),
+vec3(0., 0.8, 0.),
+vec3(0.5, 0.5, 1.),
+vec3(0., 0., 0.8),
+};
+
 vec3 getRayDir(ivec2 screenPos)
 {
     vec2 screenSpace = (screenPos + vec2(0.5)) / vec2(screenSize);
@@ -61,22 +78,14 @@ void main()
     // check if the camera is outside the voxel volume
     float intersect = AABBIntersect(vec3(0), vec3(terrainSize - 1), camPos, 1.0f / rayDir);
 
-    // if it is outside the terrain, offset the ray so its starting position is in the voxel volume
+    // if it is outside the terrain, offset the ray so its starting position is (slightly) in the voxel volume
     if (intersect > 0) {
         rayPos += rayDir * (intersect + 0.001);
     }
 
     // if the ray intersect the terrain, raytrace
     vec3 color = vec3(0.69, 0.88, 0.90); // this is the sky color
-
-    // a few base colors, indexes are refering to materials.h
-    vec3 colors[] = {
-    vec3(1.00, 0.40, 0.40), // UNDEFINED
-    vec3(0.69, 0.88, 0.90), // AIR
-    vec3(0.33, 0.33, 0.33), // STONE
-    vec3(0.42, 0.32, 0.25), // DIRT
-    vec3(0.30, 0.39, 0.31)  // GRASS
-    };
+    vec3 localRayPos = rayPos;
 
     if (intersect >= 0) {
         uint depth = 0;
@@ -89,6 +98,7 @@ void main()
 
         // index of the current node in the pool
         uint current_node = 0;
+        uint previous_node = 0;
 
         // color code of the last valid node
         uint color_code;
@@ -98,32 +108,63 @@ void main()
             depth += 1;
             node_width /= NODE_WIDTH;
             stack[depth] = current_node;
-            uvec3 r = uvec3(rayPos/node_width);
-            uint tmp = nodePool[current_node * NODE_SIZE
-            + r.x
-            + r.z * NODE_WIDTH
-            + r.y * NODE_WIDTH * NODE_WIDTH];
-            rayPos = rayPos - r*node_width;
-            current_node = (tmp & 0x00ffffffu);
-
-            // we only support 4 colors. If we receive an unsupported color, print white.
-            color_code = (tmp>>24);
+            uvec3 r = uvec3(localRayPos / node_width);
+            uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
+            localRayPos = localRayPos - r * node_width;
+            previous_node = current_node;
+            current_node = (node_data & 0x00ffffffu);
+            color_code = (node_data >> 24);
         } while (current_node != 0 && depth < 32);
 
-        // dda in the nodes of the octree
-        // while le step nous renvoie de l'air
-        // |  on trouve la direction du step
-        // |  tant que on ne peut pas juste step de 1 dans le noeud courant dans la direction demandée
-        // |  | on remonte de 1 dans l'arbre
-        // |  puis on refait le do-while plus haut en redescendant :)
+        // #######################################
+        // # Unfinished code below, please ignore
+        // #######################################
 
-        // TODO implement the above algorithm
-        // TODO support chunk leafs (I'm very scared)
+        if (false) {
+            while (color_code == 1) {
+
+                uvec3 mapPos = uvec3(floor(rayPos / node_width + 0.));
+                vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
+                vec3 sideDist = (sign(rayDir) * (vec3(mapPos) - rayPos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+                ivec3 rayStep = ivec3(sign(rayDir));
+                bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
+
+                //All components of mask are false except for the corresponding largest component of sideDist, which is the axis along which the ray should be incremented.
+                sideDist += vec3(mask) * deltaDist;
+                ivec3 step = ivec3(vec3(mask)) * rayStep * ivec3(node_width);
+
+                while (any(lessThan(rayPos + step, rayPos - mod(rayPos, node_width))) || any(greaterThanEqual(rayPos + step, rayPos + node_width - mod(rayPos, node_width)))) {
+                    node_width *= NODE_WIDTH;
+                    depth -= 1;
+                    current_node = stack[depth];
+                }
+
+                localRayPos = rayPos - mod(rayPos, node_width);
+                while (current_node != 0 && depth < 32) {
+                    depth += 1;
+                    node_width /= NODE_WIDTH;
+                    stack[depth] = current_node;
+                    uvec3 r = uvec3(localRayPos / node_width);
+                    uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
+                    localRayPos = localRayPos - r * node_width;
+                    current_node = (node_data & 0x00ffffffu);
+                    color_code = (node_data >> 24);
+                }
+            }}
+
+        // TODO finish the above code
+        // TODO support chunk leafs (I'm scared)
 
         // ensuring the color code is valid
-        if (color_code > 4) {
-            color = vec3(1.0, 1.0, 1.0);
-        } else color.xyz = colors[color_code].xyz;
+        if (color_code >= colors.length()) {
+            color.xyz = colors[0].xyz;
+        } else {
+            // setting the pixel color using the color table
+            //color.xyz = colors[color_code].xyz;
+
+            // .. or using per-node color to debug the octree
+            color.xyz = debug_colors[(previous_node >> 1) % debug_colors.length()].xyz;
+        }
     }
 
     // output color to texture
