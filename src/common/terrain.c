@@ -141,7 +141,7 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
                         u32 h = 0.25 * terrain->width +
                                 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
                         //h = 18;
-                        h = CHUNK_WIDTH + min(hx, hy);
+                        //h = CHUNK_WIDTH + min(hx, hy);
                         terrain->heightmap[hx + (u64) terrain->width * hy] = h;
                         if (h < min) min = h;
                         if (h > max) max = h;
@@ -182,7 +182,7 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                                        HeightApprox **approx_heightmaps, u32 node_address, SvoGenStats *stats) {
     depth -= 1;
     Node *node = poolAllocatorGet(&terrain->nodePool, node_address);
-    u32 subnode_width = (u32) pow(NODE_WIDTH, depth)*CHUNK_WIDTH;
+    u32 subnode_width = (u32) pow(NODE_WIDTH, depth) * CHUNK_WIDTH;
 
     // For every subnode in the node...
     for (u32 dx = 0; dx < NODE_WIDTH; dx++) {
@@ -193,13 +193,25 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
 
             // we override the height, bc we don't trust it
             //height = (HeightApprox) {.min=10, .max=12};
-            height = (HeightApprox){.min=max(cx, cy), .max=max(cx, cy)+subnode_width};
+            //height = (HeightApprox){.min=max(cx, cy), .max=max(cx, cy)+subnode_width};
+            uint h_min = terrain->width, h_max = 0;
+            for (int i = 0; i < subnode_width; i++) {
+                for (int j = 0; j < subnode_width; j++) {
+                    uint h = 0.25 * terrain->width
+                             + 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D,
+                                                                     (cx + dx * subnode_width+i) * 0.0005,
+                                                                     (cy + dy * subnode_width+j) * 0.0005) * 0.5+ 0.5);
+                    h_min = min(h_min, h);
+                    h_max = max(h_max, h);
+                }
+            }
+            height = (HeightApprox) {.min=h_min, .max=h_max};
 
             // For every subnode in the subnode column...
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {
 
                 // If the top block height of the chunk is inferior to the min height for the chunk, it's made out of stone
-                if (cz + (dz+1) * subnode_width-1 <= height.min) {
+                if (cz + (dz + 1) * subnode_width - 1 <= height.min) {
                     (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = STONE << 24;
                     stats->uniform_nodes_per_level[depth] += 1;
 
@@ -237,7 +249,7 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                         node = poolAllocatorGet(&terrain->nodePool, node_address);
 
 
-                        if(subnode_id & 0xff000000) FATAL("SVO node pool index overflow!")
+                        if (subnode_id & 0xff000000) FATAL("SVO node pool index overflow!")
                         (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24) | (subnode_id & 0x00ffffff);
 
                         stats->mixed_nodes_per_level[depth] += 1;
