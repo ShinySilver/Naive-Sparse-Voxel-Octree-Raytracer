@@ -75,7 +75,7 @@ void main()
 
     // calc ray direction for current pixel
     vec3 rayDir = getRayDir(ivec2(gl_GlobalInvocationID.xy));
-    vec3 rayPos = camPos;
+    vec3 previousRayPos, rayPos = camPos;
 
     // check if the camera is outside the voxel volume
     float intersect = AABBIntersect(vec3(0), vec3(terrainSize - 1), camPos, 1.0f / rayDir);
@@ -87,7 +87,6 @@ void main()
 
     // if the ray intersect the terrain, raytrace
     vec3 color = vec3(0.69, 0.88, 0.90); // this is the sky color
-    vec3 localRayPos = rayPos;
 
     if (intersect >= 0) {
         uint depth = 0;
@@ -105,54 +104,36 @@ void main()
         // color code of the last valid node
         uint color_code;
 
-        // setting the stack to the starting pos of the ray
-        do {
-            depth += 1;
-            node_width /= NODE_WIDTH;
-            stack[depth] = current_node;
-            uvec3 r = uvec3(localRayPos / node_width);
-            uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
-            localRayPos = localRayPos - r * node_width;
-            previous_node = current_node;
-            current_node = (node_data & 0x00ffffffu);
-            color_code = (node_data >> 24);
-        } while (current_node != 0 && depth < 32);
+        while (true) {
+            // setting the stack to the starting pos of the ray
+            do {
+                stack[depth] = current_node;
+                depth += 1;
+                node_width /= NODE_WIDTH;
+                uvec3 r = uvec3(mod(rayPos, node_width * NODE_WIDTH) / node_width);
+                uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
+                previous_node = current_node;
+                current_node = (node_data & 0x00ffffffu);
+                color_code = (node_data >> 24);
+            } while (current_node != 0 && depth < treeDepth);
 
-        // #######################################
-        // # Unfinished code below, please ignore
-        // #######################################
+            // quick exit #1: ray hit
+            if (color_code != 1) break;
 
-        if (false) {
-            while (color_code == 1) {
+            // Compute new rayPos
+            previousRayPos = rayPos;
+            rayPos += rayDir;
 
-                uvec3 mapPos = uvec3(floor(rayPos / node_width + 0.));
-                vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
-                vec3 sideDist = (sign(rayDir) * (vec3(mapPos) - rayPos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
-                ivec3 rayStep = ivec3(sign(rayDir));
-                bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
+            // Quick exit #2: ray exiting the volume
+            if (any(greaterThanEqual(rayPos, terrainSize)) || any(lessThan(rayPos, vec3(0)))) break;
 
-                //All components of mask are false except for the corresponding largest component of sideDist, which is the axis along which the ray should be incremented.
-                sideDist += vec3(mask) * deltaDist;
-                ivec3 step = ivec3(vec3(mask)) * rayStep * ivec3(node_width);
-
-                while (any(lessThan(rayPos + step, rayPos - mod(rayPos, node_width))) || any(greaterThanEqual(rayPos + step, rayPos + node_width - mod(rayPos, node_width)))) {
-                    node_width *= NODE_WIDTH;
-                    depth -= 1;
-                    current_node = stack[depth];
-                }
-
-                localRayPos = rayPos - mod(rayPos, node_width);
-                while (current_node != 0 && depth < 32) {
-                    depth += 1;
-                    node_width /= NODE_WIDTH;
-                    stack[depth] = current_node;
-                    uvec3 r = uvec3(localRayPos / node_width);
-                    uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
-                    localRayPos = localRayPos - r * node_width;
-                    current_node = (node_data & 0x00ffffffu);
-                    color_code = (node_data >> 24);
-                }
-            }}
+            // While pos+step is not in current_node, step up
+            do {
+                node_width *= NODE_WIDTH;
+                depth -= 1;
+                current_node = stack[depth];
+            } while (depth > 0 && any(lessThan(rayPos, previousRayPos - mod(previousRayPos, node_width))) || any(greaterThanEqual(rayPos, previousRayPos + node_width - mod(previousRayPos, node_width))));
+        }
 
         // TODO finish the above code
         // TODO support chunk leafs (I'm scared)
@@ -160,11 +141,11 @@ void main()
         // ensuring the color code is valid
         if (color_code >= colors.length()) {
             color.xyz = colors[0].xyz;
-        } else if(color_code>1){
+        } else if (color_code > 1) {
             // using per-node color to debug the octree
             // the whole "else-if" block can be commented to restore the original colors
             color.xyz = debug_colors[previous_node % debug_colors.length()].xyz;
-        }else{
+        } else {
             // setting the pixel color using the color table
             color.xyz = colors[color_code].xyz;
         }
