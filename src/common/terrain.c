@@ -10,6 +10,8 @@
 #include "log.h"
 #include "cptime.h"
 
+#define DEBUG_DISABLE_HEIGHTMAP_GEN
+
 typedef struct SvoGenStats {
     u32 *empty_nodes_per_level;
     u32 *uniform_nodes_per_level;
@@ -100,7 +102,6 @@ static void terrain_generate(Terrain *terrain) {
      * Creating the root node, and feeding it to the recursive function to create its leaves
      */
     terrain->root_node_address = poolAllocatorAlloc(&terrain->nodePool);
-    //INFO("%p", poolAllocatorGet(&terrain->nodePool, terrain->root_node_address));
     terrain_generate_recursive(terrain, 0, 0, 0, terrain->depth, terrain->approx_heightmaps,
                                terrain->root_node_address,
                                &stats);
@@ -138,9 +139,9 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
                     for (u32 dy = 0; dy < CHUNK_WIDTH; dy++) {
                         u32 hx = cx * CHUNK_WIDTH + dx;
                         u32 hy = cy * CHUNK_WIDTH + dy;
-                        u32 h = 0.25 * terrain->width +
-                                0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
-                        //h = 18;
+                        //u32 h = 0.25 * terrain->width +
+                        //        0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
+                        u32 h = 18;
                         //h = CHUNK_WIDTH + min(hx, hy);
                         terrain->heightmap[hx + (u64) terrain->width * hy] = h;
                         if (h < min) min = h;
@@ -193,8 +194,8 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
 
             // we override the height, bc we don't trust it
             //height = (HeightApprox) {.min=10, .max=12};
-            //height = (HeightApprox){.min=max(cx, cy), .max=max(cx, cy)+subnode_width};
-            uint h_min = terrain->width, h_max = 0;
+            height = (HeightApprox){.min=max(cx, cy), .max=max(cx, cy)+subnode_width};
+            /*uint h_min = terrain->width, h_max = 0;
             for (int i = 0; i < subnode_width; i++) {
                 for (int j = 0; j < subnode_width; j++) {
                     uint h = 0.25 * terrain->width
@@ -205,7 +206,7 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                     h_max = max(h_max, h);
                 }
             }
-            height = (HeightApprox) {.min=h_min, .max=h_max};
+            height = (HeightApprox) {.min=h_min, .max=h_max};//*/
 
             // For every subnode in the subnode column...
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {

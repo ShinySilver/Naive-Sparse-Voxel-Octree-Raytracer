@@ -12,6 +12,8 @@ uniform mat4 viewMat;
 uniform mat4 projMat;
 
 #define NODE_WIDTH 2
+#define MAX_DDA_STEPS 128
+#define MINI_STEP_SIZE 4e-2
 #define NODE_SIZE NODE_WIDTH * NODE_WIDTH * NODE_WIDTH
 
 layout (std430, binding = 0) readonly buffer node_pool
@@ -67,6 +69,11 @@ float AABBIntersect(vec3 bmin, vec3 bmax, vec3 orig, vec3 invdir)
     return -1;
 }
 
+float sign11(float x)
+{
+    return x<0. ? -1. : 1.;
+}
+
 void main()
 {
     // make sure current thread is inside the window bounds
@@ -104,7 +111,12 @@ void main()
         // color code of the last valid node
         uint color_code;
 
-        while (true) {
+        // Compute once and for all a few variables
+        vec3 invertedRayDir = 1. / rayDir;
+        vec3 raySign = vec3(sign11(rayDir.x), sign11(rayDir.y), sign11(rayDir.z));
+        vec3 raySign01 = max(raySign, 0.);
+
+        for(int i=0; i<MAX_DDA_STEPS; i++) {
             // setting the stack to the starting pos of the ray
             do {
                 stack[depth] = current_node;
@@ -120,9 +132,23 @@ void main()
             // quick exit #1: ray hit
             if (color_code != 1) break;
 
+            // Compute step
+            vec3 tMax = invertedRayDir * (node_width * raySign01 - mod(rayPos, node_width));
+            float rayStep = min(tMax.x, min(tMax.y, tMax.z));
+
             // Compute new rayPos
             previousRayPos = rayPos;
-            rayPos += rayDir;
+            rayPos += rayStep*rayDir;
+            rayPos += MINI_STEP_SIZE*raySign; // TODO: improve this
+
+        /*
+            ivec3 mapPos = ivec3(floor(rayPos/node_width));
+            vec3 sideDist = (sign(rayDir) * (vec3(mapPos) - rayPos/node_width) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+            bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
+            sideDist += vec3(mask) * deltaDist;
+            mapPos += ivec3(vec3(mask)) * rayStep;
+            previousRayPos = rayPos;
+            rayPos += rayDir;*/
 
             // Quick exit #2: ray exiting the volume
             if (any(greaterThanEqual(rayPos, terrainSize)) || any(lessThan(rayPos, vec3(0)))) break;
