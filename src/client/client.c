@@ -17,7 +17,7 @@ void client_start(void) {
      */
     INFO("Generating terrain.");
     Terrain terrain;
-    terrain_init(&terrain, 8);
+    terrain_init(&terrain, 10);
     camera_pos = (vec3){-0.5*terrain.width,1.5*terrain.width, -0.5*terrain.width};
     camera_forward = (vec3) {0.5, -0.5, 0.5};
 
@@ -37,7 +37,13 @@ void client_start(void) {
      * Setup some stats in order to compute framerate
      */
     u32 frametime = 0, accum = 0, count = 0, time = uclock();
-    char win_title[64];
+    char win_title[128];
+
+    /**
+     * Get the graphic card name, for display/debug purpose
+     */
+    const GLubyte *gl_renderer_name = glGetString(GL_RENDERER);
+    const GLubyte *gl_vendor_name = glGetString(GL_VENDOR);
 
     /**
      * Render loop!
@@ -65,7 +71,7 @@ void client_start(void) {
         count++;
         if (accum / UCLOCKS_PER_SECONDS >= 1) {
             float frame_time = (accum / (float) count / UCLOCKS_PER_SECONDS * 1000.0f);
-            snprintf(win_title, 64, "iVy - %0.2fms - %0.2fFPS", frame_time, 1e3/frame_time);
+            snprintf(win_title, 128, "iVy - %0.2fms - %0.2fFPS - %s %s - %dx%d", frame_time, 1e3/frame_time, gl_vendor_name, gl_renderer_name, render_resolution_x, render_resolution_y);
             glfwSetWindowTitle(window, win_title);
             accum = 0;
             count = 0;

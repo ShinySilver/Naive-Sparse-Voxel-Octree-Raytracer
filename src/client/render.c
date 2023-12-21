@@ -15,8 +15,8 @@ static u32 svo_tracer_shader;
 static u32 svo_framebuffer;
 static Texture *svoTexture = 0;
 
-static int render_resolution_x;
-static int render_resolution_y;
+int render_resolution_x;
+int render_resolution_y;
 
 static void render_framebuffer_size_callback(GLFWwindow *_window, int width, int height);
 
@@ -51,18 +51,18 @@ void render_draw_frame(Terrain *terrain) {
 
         // (Re)Uploading the SVO
         // Naive implementation. Must be improved
-        if (terrain->chunkPool.maxSize != currentChunkBufferSize) {
-            glNamedBufferData(terrainChunkPoolSSBO, terrain->chunkPool.maxSize * terrain->chunkPool.unitSize,
+        if (terrain->chunkPool.size != currentChunkBufferSize) {
+            glNamedBufferData(terrainChunkPoolSSBO, terrain->chunkPool.size * terrain->chunkPool.unitSize,
                               terrain->chunkPool.memory, GL_STATIC_DRAW);
         } else {
-            glNamedBufferSubData(terrainChunkPoolSSBO, 0, terrain->chunkPool.maxSize * terrain->chunkPool.unitSize,
+            glNamedBufferSubData(terrainChunkPoolSSBO, 0, terrain->chunkPool.size * terrain->chunkPool.unitSize,
                                  terrain->chunkPool.memory);
         }
-        if (terrain->nodePool.maxSize != currentNodeBufferSize) {
-            glNamedBufferData(terrainNodePoolSSBO, terrain->nodePool.maxSize * terrain->nodePool.unitSize,
+        if (terrain->nodePool.size != currentNodeBufferSize) {
+            glNamedBufferData(terrainNodePoolSSBO, terrain->nodePool.size * terrain->nodePool.unitSize,
                               terrain->nodePool.memory, GL_STATIC_DRAW);
         } else {
-            glNamedBufferSubData(terrainNodePoolSSBO, 0, terrain->nodePool.maxSize * terrain->nodePool.unitSize,
+            glNamedBufferSubData(terrainNodePoolSSBO, 0, terrain->nodePool.size * terrain->nodePool.unitSize,
                                  terrain->nodePool.memory);
         }
     }

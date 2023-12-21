@@ -111,8 +111,8 @@ static void terrain_generate(Terrain *terrain) {
              i == 0 ? "chunks" : "mixed nodes");
     }
 
-    INFO("Chunk pool memory footprint: %.00f Mb", (size_t) terrain->chunkPool.size * terrain->chunkPool.unitSize / 1e6);
-    INFO("SVO nodes pool memory footprint: %.00f Mb", (size_t) terrain->nodePool.size * terrain->nodePool.unitSize / 1e6);
+    INFO("Chunk pool memory footprint: %.00f MB, %d bits addressing minimum", (size_t) terrain->chunkPool.size * terrain->chunkPool.unitSize / 1e6, (int) ceil(log2(terrain->chunkPool.size)));
+    INFO("SVO nodes pool memory footprint: %.00f MB, %d bits addressing minimum", (size_t) terrain->nodePool.size * terrain->nodePool.unitSize / 1e6, (int) ceil(log2(terrain->nodePool.size)));
 
     free(stats.mixed_nodes_per_level);
     free(stats.uniform_nodes_per_level);
@@ -194,7 +194,7 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
 
             // we override the height, bc we don't trust it
             //height = (HeightApprox) {.min=10, .max=12};
-            height = (HeightApprox){.min=max(cx, cy), .max=max(cx, cy)+subnode_width};
+            height = (HeightApprox) {.min=max(cx, cy), .max=max(cx, cy) + subnode_width};
             /*uint h_min = terrain->width, h_max = 0;
             for (int i = 0; i < subnode_width; i++) {
                 for (int j = 0; j < subnode_width; j++) {

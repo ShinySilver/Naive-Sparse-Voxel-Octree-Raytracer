@@ -139,7 +139,13 @@ void main()
             // Compute new rayPos
             previousRayPos = rayPos;
             rayPos += rayStep*rayDir;
-            rayPos += MINI_STEP_SIZE*raySign; // TODO: improve this
+
+            // And a mini-step in the ray step direction, to ensure we are not stuck at the frontier of the same node
+            // We'll need to do better - to only mini-step in the direction of the wall we went through
+            // vec3 mask = vec3(greaterThan(raySign*(floor((rayPos+MINI_STEP_SIZE*raySign)/node_width)-floor(previousRayPos/node_width)), vec3(0))); // nope, le mini step step 2...
+            // Et si on s'en servait pour l'occlusion ambiante?
+            vec3 mask = vec3(1);
+            rayPos += MINI_STEP_SIZE*raySign*mask;
 
         /*
             ivec3 mapPos = ivec3(floor(rayPos/node_width));
