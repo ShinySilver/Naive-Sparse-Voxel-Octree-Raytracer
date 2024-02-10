@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 17)
 include_directories(src)
 #target_precompile_headers(iVy PUBLIC inc/pch.h)
 set(dir ${CMAKE_CURRENT_SOURCE_DIR}/src)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${dir}/../build)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${dir}/..)
 
 set(CMAKE_C_FLAGS "-std=c17 -mavx2 -mfma")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -static")
