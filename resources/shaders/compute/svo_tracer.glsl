@@ -12,9 +12,13 @@ uniform mat4 viewMat;
 uniform mat4 projMat;
 
 #define NODE_WIDTH 2
-#define MAX_DDA_STEPS 128
+#define MAX_DDA_STEPS 256
 #define MINI_STEP_SIZE 4e-2
+#define LOD_BIAS 2 // 0 is the default. negative value means more distant details, positive value means less details
 #define NODE_SIZE NODE_WIDTH * NODE_WIDTH * NODE_WIDTH
+#undef  USE_DEBUG_COLORS
+#define USE_FAKE_LIGHT
+#define USE_LOD
 
 layout (std430, binding = 0) readonly buffer node_pool
 {
@@ -30,9 +34,9 @@ layout (std430, binding = 1) readonly buffer chunk_pool
 vec3 colors[] = {
 vec3(1.00, 0.40, 0.40), // UNDEFINED
 vec3(0.69, 0.88, 0.90), // AIR
-vec3(0.33, 0.33, 0.33), // STONE
+vec3(0.55, 0.55, 0.55), // STONE
 vec3(0.42, 0.32, 0.25), // DIRT
-vec3(0.30, 0.39, 0.31)  // GRASS
+vec3(0.30, 0.59, 0.31)  // GRASS
 };
 vec3 debug_colors[] = {
 vec3(1.0, 0.5, 0.5),
@@ -69,6 +73,10 @@ float AABBIntersect(vec3 bmin, vec3 bmax, vec3 orig, vec3 invdir)
     return -1;
 }
 
+float max_depth(float distance){
+    return ceil(treeDepth-sqrt(distance)/(60-LOD_BIAS*10));
+}
+
 float sign11(float x)
 {
     return x<0. ? -1. : 1.;
@@ -89,11 +97,12 @@ void main()
 
     // if it is outside the terrain, offset the ray so its starting position is (slightly) in the voxel volume
     if (intersect > 0) {
-        rayPos += rayDir * (intersect + 0.001);
+        rayPos += rayDir * (intersect + MINI_STEP_SIZE);
     }
 
     // if the ray intersect the terrain, raytrace
     vec3 color = vec3(0.69, 0.88, 0.90); // this is the sky color
+    vec3 mask = vec3(1, 0, 0);
 
     if (intersect >= 0) {
         uint depth = 0;
@@ -127,7 +136,11 @@ void main()
                 previous_node = current_node;
                 current_node = (node_data & 0x00ffffffu);
                 color_code = (node_data >> 24);
-            } while (current_node != 0 && depth < treeDepth);
+            #ifdef USE_LOD
+            } while (current_node != 0 && depth < max_depth(distance(rayPos, camPos)));
+            #else
+            } while (current_node != 0 && depth < treeDepth); // && depth < max_depth(distance(rayPos, camPos)));
+            #endif
 
             // quick exit #1: ray hit
             if (color_code != 1) break;
@@ -144,7 +157,7 @@ void main()
             // We'll need to do better - to only mini-step in the direction of the wall we went through
             // vec3 mask = vec3(greaterThan(raySign*(floor((rayPos+MINI_STEP_SIZE*raySign)/node_width)-floor(previousRayPos/node_width)), vec3(0))); // nope, le mini step step 2...
             // Et si on s'en servait pour l'occlusion ambiante?
-            vec3 mask = vec3(1);
+            mask = vec3(equal(tMax, vec3(rayStep)));
             rayPos += MINI_STEP_SIZE*raySign*mask;
 
         /*
@@ -173,10 +186,17 @@ void main()
         // ensuring the color code is valid
         if (color_code >= colors.length()) {
             color.xyz = colors[0].xyz;
+        #ifdef USE_DEBUG_COLORS
         } else if (color_code > 1) {
             // using per-node color to debug the octree
             // the whole "else-if" block can be commented to restore the original colors
             color.xyz = debug_colors[previous_node % debug_colors.length()].xyz;
+        #endif
+        #ifdef USE_FAKE_LIGHT
+        } else if (color_code > 1){
+            // setting the pixel color using the color table
+            color.xyz = colors[color_code].xyz*dot(mask*vec3(0.9, 0.7, 0.4), vec3(1));
+        #endif
         } else {
             // setting the pixel color using the color table
             color.xyz = colors[color_code].xyz;

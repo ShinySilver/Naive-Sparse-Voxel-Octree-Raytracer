@@ -10,8 +10,6 @@
 #include "log.h"
 #include "cptime.h"
 
-#define DEBUG_DISABLE_HEIGHTMAP_GEN
-
 typedef struct SvoGenStats {
     u32 *empty_nodes_per_level;
     u32 *uniform_nodes_per_level;
@@ -127,22 +125,21 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
         // Create a heightmap at the right size
         heightmaps[0] = (HeightApprox *) malloc(width_chunks * width_chunks * sizeof(HeightApprox));
         if (!heightmaps[0]) FATAL("Out of memory.");
-        INFO("Generating heightmap of size %ux%u, with one heightmap entry being one %ux%u chunk.",
-             width_chunks, width_chunks, (u32) CHUNK_WIDTH, (u32) CHUNK_WIDTH);
+        INFO("Generating heightmap of size %ux%u, depth %u and size %u. One heightmap entry is one %ux%u chunk.",
+             width_chunks, width_chunks, depth, (u32)(width_chunks * width_chunks * sizeof(HeightApprox)), (u32) CHUNK_WIDTH, (u32) CHUNK_WIDTH);
 
         // For every chunk of the map...
         for (u32 cx = 0; cx < width_chunks; cx++) {
             for (u32 cy = 0; cy < width_chunks; cy++) {
                 // Generate a precise heightmap but only keep a min and a max per chunk
                 u32 min = UINT32_MAX, max = 0;
-                for (u32 dx = 0; dx < CHUNK_WIDTH; dx++) {
-                    for (u32 dy = 0; dy < CHUNK_WIDTH; dy++) {
+                for (u32 dx = 0; dx < CHUNK_WIDTH; dx+=CHUNK_WIDTH/NOISE_SAMPLE_PER_CHUNK_WIDTH) {
+                    for (u32 dy = 0; dy < CHUNK_WIDTH; dy+=CHUNK_WIDTH/NOISE_SAMPLE_PER_CHUNK_WIDTH) {
                         u32 hx = cx * CHUNK_WIDTH + dx;
                         u32 hy = cy * CHUNK_WIDTH + dy;
-                        //u32 h = 0.25 * terrain->width +
-                        //        0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D, hx * 0.005, hy * 0.005) * 0.5 + 0.5);
-                        u32 h = 18;
-                        //h = CHUNK_WIDTH + min(hx, hy);
+                        u32 scale = min(terrain->width, 8192);
+                        u32 h = 0.25 * scale +
+                                0.5 * scale * (fnlGetNoise2D(&noiseGen2D, hx * 1e-4, hy * 1e-4) * 0.5 + 0.5);
                         terrain->heightmap[hx + (u64) terrain->width * hy] = h;
                         if (h < min) min = h;
                         if (h > max) max = h;
@@ -155,10 +152,9 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
         // Create a heightmap at the right size
         heightmaps[depth] = (HeightApprox *) malloc(width_chunks * width_chunks * sizeof(HeightApprox));
         if (!heightmaps[depth]) FATAL("Out of memory.");
-        INFO("Generating sub-heightmap of size %ux%u with each heightmap entry corresponding to one %ux%u level %u node.",
-             width_chunks, width_chunks, CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth),
-             CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth),
-             depth);
+        INFO("Generating sub-heightmap of size %ux%u, depth %u and size %u. One heightmap entry is corresponding to one %ux%u voxels level %u chunk.",
+             width_chunks, width_chunks, depth, (u32)(width_chunks * width_chunks * sizeof(HeightApprox)), CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth),
+             CHUNK_WIDTH * (u32) pow(NODE_WIDTH, depth), depth);
 
         // For every chunk of the map...
         for (u32 cx = 0; cx < width_chunks; cx++) {
@@ -166,7 +162,7 @@ static void terrain_generate_heightmap_recursive(Terrain *terrain, u32 width_chu
                 u32 min = UINT32_MAX, max = 0;
                 for (u32 dx = 0; dx < NODE_WIDTH; dx++) {
                     for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
-                        HeightApprox h = heightmaps[depth - 1][cx + dx + (cy + dy) * width_chunks * NODE_WIDTH];
+                        HeightApprox h = heightmaps[depth - 1][cx*NODE_WIDTH + dx + (cy*NODE_WIDTH + dy) * width_chunks*NODE_WIDTH];
                         if (h.min < min) min = h.min;
                         if (h.max > max) max = h.max;
                     }
@@ -190,23 +186,7 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
         for (u32 dy = 0; dy < NODE_WIDTH; dy++) {
 
             // We cache the height for the whole vertical columne
-            HeightApprox height;// = approx_heightmaps[depth][(cx + dx*subnode_width)/CHUNK_WIDTH + (cy + dy*subnode_width)/CHUNK_WIDTH];
-
-            // we override the height, bc we don't trust it
-            //height = (HeightApprox) {.min=10, .max=12};
-            height = (HeightApprox) {.min=max(cx, cy), .max=max(cx, cy) + subnode_width};
-            /*uint h_min = terrain->width, h_max = 0;
-            for (int i = 0; i < subnode_width; i++) {
-                for (int j = 0; j < subnode_width; j++) {
-                    uint h = 0.25 * terrain->width
-                             + 0.5 * terrain->width * (fnlGetNoise2D(&noiseGen2D,
-                                                                     (cx + dx * subnode_width+i) * 0.0005,
-                                                                     (cy + dy * subnode_width+j) * 0.0005) * 0.5+ 0.5);
-                    h_min = min(h_min, h);
-                    h_max = max(h_max, h);
-                }
-            }
-            height = (HeightApprox) {.min=h_min, .max=h_max};//*/
+            HeightApprox height = approx_heightmaps[depth][(int)((cx/subnode_width + dx) + (cy/subnode_width + dy)*pow(NODE_WIDTH, terrain->depth-depth))];
 
             // For every subnode in the subnode column...
             for (u32 dz = 0; dz < NODE_WIDTH; dz++) {

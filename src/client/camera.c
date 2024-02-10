@@ -5,11 +5,6 @@
 vec3 camera_pos = (vec3) {0, 0, 0};
 vec3 camera_forward = (vec3) {0.5, 0.5, 0};
 
-#define CAMERA_BASE_SPEED (20)
-#define CAMERA_FAST_SPEED (500)
-#define CAMERA_SPEED_MULTIPLIER (10)
-#define CAMERA_MOUSE_SENSITIVITY (5)
-
 void camera_update(GLFWwindow *window, float deltaTime) {
     static float accum = 0;
     static bool has_recently_moved_keyboard = false, has_recently_moved_mouse = false;
