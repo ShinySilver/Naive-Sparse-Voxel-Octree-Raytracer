@@ -5,7 +5,7 @@
 #include "pool_allocator.h"
 
 #define CHUNK_WIDTH (8)
-#define NOISE_SAMPLE_PER_CHUNK_WIDTH (2)
+#define NOISE_SAMPLE_PER_CHUNK_WIDTH (1)
 #define NODE_WIDTH (2)
 
 /**

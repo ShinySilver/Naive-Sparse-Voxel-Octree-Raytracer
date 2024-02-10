@@ -18,7 +18,7 @@ uniform mat4 projMat;
 #define NODE_SIZE NODE_WIDTH * NODE_WIDTH * NODE_WIDTH
 #undef  USE_DEBUG_COLORS
 #define USE_FAKE_LIGHT
-#define USE_LOD
+#undef USE_LOD
 
 layout (std430, binding = 0) readonly buffer node_pool
 {

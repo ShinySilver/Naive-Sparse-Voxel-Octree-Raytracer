@@ -207,7 +207,7 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                     if (depth == 0) { // surprise! it's not a node, it's a chunk!
 
                         // since it's a chunk, we allocate from the chunk pool
-                        u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
+//                        u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
 
                         // then update the current node address. In this specific case, it's probably not necessary, oh well.
                         node = poolAllocatorGet(&terrain->nodePool, node_address);
@@ -217,11 +217,11 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                         (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24); // | (chunk_id & 0x0fff);
 
                         // actual chunk gen is here, in the terrain_generate_chunk function.
-                        terrain_generate_chunk(terrain,
-                                               cx + dx * subnode_width,
-                                               cy + dy * subnode_width,
-                                               cz + dz * subnode_width,
-                                               poolAllocatorGet(&terrain->chunkPool, chunk_id));
+//                        terrain_generate_chunk(terrain,
+//                                               cx + dx * subnode_width,
+//                                               cy + dy * subnode_width,
+//                                               cz + dz * subnode_width,
+//                                               poolAllocatorGet(&terrain->chunkPool, chunk_id));
 
                         // at last updating the stats...
                         stats->mixed_nodes_per_level[depth] += 1;
