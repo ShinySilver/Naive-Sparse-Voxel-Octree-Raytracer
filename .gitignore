@@ -2,3 +2,5 @@ build/
 cmake*
 ref/
 .idea/
+**/CMakeFiles/
+iVy
