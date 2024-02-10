@@ -14,11 +14,11 @@ uniform mat4 projMat;
 #define NODE_WIDTH 2
 #define MAX_DDA_STEPS 256
 #define MINI_STEP_SIZE 4e-2
-#define LOD_BIAS 2 // 0 is the default. negative value means more distant details, positive value means less details
+#define LOD_BIAS 0 // 0 is the default. negative value means more distant details, positive value means less details
 #define NODE_SIZE NODE_WIDTH * NODE_WIDTH * NODE_WIDTH
 #undef  USE_DEBUG_COLORS
 #define USE_FAKE_LIGHT
-#undef USE_LOD
+#define USE_LOD
 
 layout (std430, binding = 0) readonly buffer node_pool
 {
