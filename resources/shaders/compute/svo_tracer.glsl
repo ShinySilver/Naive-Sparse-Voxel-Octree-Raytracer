@@ -16,6 +16,10 @@ uniform mat4 projMat;
 #define MINI_STEP_SIZE 4e-2
 #define NODE_SIZE NODE_WIDTH * NODE_WIDTH * NODE_WIDTH
 
+#undef  USE_DEBUG_COLORS
+#define USE_FAKE_LIGHT
+#define USE_LOD
+
 layout (std430, binding = 0) readonly buffer node_pool
 {
     uint nodePool[];
@@ -30,9 +34,9 @@ layout (std430, binding = 1) readonly buffer chunk_pool
 vec3 colors[] = {
 vec3(1.00, 0.40, 0.40), // UNDEFINED
 vec3(0.69, 0.88, 0.90), // AIR
-vec3(0.33, 0.33, 0.33), // STONE
+vec3(0.55, 0.55, 0.55), // STONE
 vec3(0.42, 0.32, 0.25), // DIRT
-vec3(0.30, 0.39, 0.31)  // GRASS
+vec3(0.30, 0.59, 0.31)  // GRASS
 };
 vec3 debug_colors[] = {
 vec3(1.0, 0.5, 0.5),
@@ -94,6 +98,7 @@ void main()
 
     // if the ray intersect the terrain, raytrace
     vec3 color = vec3(0.69, 0.88, 0.90); // this is the sky color
+    vec3 mask = vec3(1, 0, 0);
 
     if (intersect >= 0) {
         uint depth = 0;
@@ -109,7 +114,7 @@ void main()
         uint previous_node = 0;
 
         // color code of the last valid node
-        uint color_code;
+        uint node_data;
 
         // Compute once and for all a few variables
         vec3 invertedRayDir = 1. / rayDir;
@@ -123,14 +128,14 @@ void main()
                 depth += 1;
                 node_width /= NODE_WIDTH;
                 uvec3 r = uvec3(mod(rayPos, node_width * NODE_WIDTH) / node_width);
-                uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
+                uint index = current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH;
+                node_data = (nodePool[index>>1]>>(((index%2))*16))&0xffffu;//
                 previous_node = current_node;
-                current_node = (node_data & 0x00ffffffu);
-                color_code = (node_data >> 24);
-            } while (current_node != 0 && depth < treeDepth);
+                current_node = (node_data & 0x7fffu);
+            } while ((node_data>>15)==0 && depth < treeDepth);
 
             // quick exit #1: ray hit
-            if (color_code != 1) break;
+            if (current_node != 1) break;
 
             // Compute step
             vec3 tMax = invertedRayDir * (node_width * raySign01 - mod(rayPos, node_width));
@@ -144,7 +149,7 @@ void main()
             // We'll need to do better - to only mini-step in the direction of the wall we went through
             // vec3 mask = vec3(greaterThan(raySign*(floor((rayPos+MINI_STEP_SIZE*raySign)/node_width)-floor(previousRayPos/node_width)), vec3(0))); // nope, le mini step step 2...
             // Et si on s'en servait pour l'occlusion ambiante?
-            vec3 mask = vec3(1);
+            mask = vec3(equal(tMax, vec3(rayStep)));
             rayPos += MINI_STEP_SIZE*raySign*mask;
 
         /*
@@ -167,19 +172,24 @@ void main()
             } while (depth > 0 && any(lessThan(rayPos, previousRayPos - mod(previousRayPos, node_width))) || any(greaterThanEqual(rayPos, previousRayPos + node_width - mod(previousRayPos, node_width))));
         }
 
-        // TODO finish the above code
         // TODO support chunk leafs (I'm scared)
 
         // ensuring the color code is valid
-        if (color_code >= colors.length()) {
+        if (current_node >= colors.length()) {
             color.xyz = colors[0].xyz;
-        } else if (color_code > 1) {
+            #ifdef USE_DEBUG_COLORS
+        } else if (current_node > 1) {
             // using per-node color to debug the octree
             // the whole "else-if" block can be commented to restore the original colors
             color.xyz = debug_colors[previous_node % debug_colors.length()].xyz;
+            #elif defined(USE_FAKE_LIGHT)
+        } else if (current_node > 1){
+            // setting the pixel color using the color table
+            color.xyz = colors[current_node].xyz*dot(mask*vec3(0.9, 0.7, 0.4), vec3(1));
+            #endif
         } else {
             // setting the pixel color using the color table
-            color.xyz = colors[color_code].xyz;
+            color.xyz = colors[current_node].xyz;
         }
     }
 

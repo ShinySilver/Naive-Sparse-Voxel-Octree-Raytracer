@@ -5,6 +5,7 @@
 #include "pool_allocator.h"
 
 #define CHUNK_WIDTH (8)
+#define NOISE_SAMPLE_PER_CHUNK_WIDTH (1)
 #define NODE_WIDTH (2)
 
 /**
@@ -41,7 +42,7 @@ typedef Voxel Chunk[CHUNK_WIDTH*CHUNK_WIDTH*CHUNK_WIDTH];
  * Since a chunk is 512 bytes, we can address ~ 8 Go RAM worth of chunks
  * If the 8 bit voxel is 0xff, it's an address to a Node or to air rather than a chunk
  */
-typedef u32 Node[NODE_WIDTH*NODE_WIDTH*NODE_WIDTH];
+typedef u16 Node[NODE_WIDTH*NODE_WIDTH*NODE_WIDTH];
 
 typedef struct HeightApprox {
     u32 min;
