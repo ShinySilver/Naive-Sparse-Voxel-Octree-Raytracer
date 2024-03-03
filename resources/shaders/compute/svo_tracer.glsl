@@ -12,13 +12,16 @@ uniform mat4 viewMat;
 uniform mat4 projMat;
 
 #define NODE_WIDTH 2
+#define CHUNK_WIDTH 8
+#define CHUNK_SIZE 8*8*8
 #define MAX_DDA_STEPS 256
 #define MINI_STEP_SIZE 4e-2
 #define LOD_BIAS 0 // 0 is the default. negative value means more distant details, positive value means less details
 #define NODE_SIZE NODE_WIDTH * NODE_WIDTH * NODE_WIDTH
+
 #undef  USE_DEBUG_COLORS
 #define USE_FAKE_LIGHT
-#define USE_LOD
+#undef USE_LOD
 
 layout (std430, binding = 0) readonly buffer node_pool
 {
@@ -125,63 +128,92 @@ void main()
         vec3 raySign = vec3(sign11(rayDir.x), sign11(rayDir.y), sign11(rayDir.z));
         vec3 raySign01 = max(raySign, 0.);
 
-        for(int i=0; i<MAX_DDA_STEPS; i++) {
+        int i = 0;
+        do {
+            for (; i < MAX_DDA_STEPS; i++) {
+                // setting the stack to the starting pos of the ray
+                do {
+                    stack[depth] = current_node;
+                    depth += 1;
+                    node_width /= NODE_WIDTH;
+                    uvec3 r = uvec3(mod(rayPos, node_width * NODE_WIDTH) / node_width);
+                    uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
+                    previous_node = current_node;
+                    current_node = (node_data & 0x00ffffffu);
+                    color_code = (node_data >> 24);
+                } while (current_node != 0 && depth < treeDepth); // && depth < max_depth(distance(rayPos, camPos)));
+
+                // quick exit #1: ray hit
+                if (color_code != 1) break;
+
+                // Compute step
+                vec3 tMax = invertedRayDir * (node_width * raySign01 - mod(rayPos, node_width));
+                float rayStep = min(tMax.x, min(tMax.y, tMax.z));
+
+                // Compute new rayPos
+                previousRayPos = rayPos;
+                rayPos += rayStep * rayDir;
+
+                // And a mini-step in the ray step direction, to ensure we are not stuck at the frontier of the same node
+                // We'll need to do better - to only mini-step in the direction of the wall we went through
+                // vec3 mask = vec3(greaterThan(raySign*(floor((rayPos+MINI_STEP_SIZE*raySign)/node_width)-floor(previousRayPos/node_width)), vec3(0))); // nope, le mini step step 2...
+                // Et si on s'en servait pour l'occlusion ambiante?
+                mask = vec3(equal(tMax, vec3(rayStep)));
+                rayPos += MINI_STEP_SIZE * raySign * mask;
+
+                // Quick exit #2: ray exiting the volume
+                if (any(greaterThanEqual(rayPos, terrainSize)) || any(lessThan(rayPos, vec3(0)))) break;
+
+                // While pos+step is not in current_node, step up
+                do {
+                    node_width *= NODE_WIDTH;
+                    depth -= 1;
+                    current_node = stack[depth];
+                } while (depth > 0 && any(lessThan(rayPos, previousRayPos - mod(previousRayPos, node_width))) || any(greaterThanEqual(rayPos, previousRayPos + node_width - mod(previousRayPos, node_width))));
+            }
+            // TODO support chunk leafs (I'm scared)
+            // Do
+            // get voxel info
+            // if it's a hit, return
+            // get dda step
+            // step
+            // while we are in the leaf
             // setting the stack to the starting pos of the ray
-            do {
-                stack[depth] = current_node;
-                depth += 1;
-                node_width /= NODE_WIDTH;
-                uvec3 r = uvec3(mod(rayPos, node_width * NODE_WIDTH) / node_width);
-                uint node_data = nodePool[current_node * NODE_SIZE + r.x + r.z * NODE_WIDTH + r.y * NODE_WIDTH * NODE_WIDTH];
-                previous_node = current_node;
-                current_node = (node_data & 0x00ffffffu);
-                color_code = (node_data >> 24);
-            #ifdef USE_LOD
-            } while (current_node != 0 && depth < max_depth(distance(rayPos, camPos)));
-            #else
-            } while (current_node != 0 && depth < treeDepth); // && depth < max_depth(distance(rayPos, camPos)));
-            #endif
+            do{
+                uvec3 r = uvec3(mod(rayPos, CHUNK_WIDTH));
+                uint addr = current_node * CHUNK_SIZE + r.x + r.z * CHUNK_WIDTH + r.y * CHUNK_WIDTH * CHUNK_WIDTH;
+                color_code = chunkPool[uint(addr/2)]>>8*addr%2;
 
-            // quick exit #1: ray hit
+                // quick exit #1: ray hit
+                if (color_code != 1) break;
+
+                // Compute step
+                vec3 tMax = invertedRayDir * (CHUNK_WIDTH * raySign01 - mod(rayPos, CHUNK_WIDTH));
+                float rayStep = min(tMax.x, min(tMax.y, tMax.z));
+
+                // Compute new rayPos
+                previousRayPos = rayPos;
+                rayPos += rayStep * rayDir;
+
+                // And a mini-step in the ray step direction, to ensure we are not stuck at the frontier of the same node
+                mask = vec3(equal(tMax, vec3(rayStep)));
+                rayPos += MINI_STEP_SIZE * raySign * mask;
+            }while(all(greaterThanEqual(rayPos, vec3(0))) && all(lessThan(rayPos, vec3(CHUNK_WIDTH))));
+
+            // Quick exit #1: ray hit
             if (color_code != 1) break;
-
-            // Compute step
-            vec3 tMax = invertedRayDir * (node_width * raySign01 - mod(rayPos, node_width));
-            float rayStep = min(tMax.x, min(tMax.y, tMax.z));
-
-            // Compute new rayPos
-            previousRayPos = rayPos;
-            rayPos += rayStep*rayDir;
-
-            // And a mini-step in the ray step direction, to ensure we are not stuck at the frontier of the same node
-            // We'll need to do better - to only mini-step in the direction of the wall we went through
-            // vec3 mask = vec3(greaterThan(raySign*(floor((rayPos+MINI_STEP_SIZE*raySign)/node_width)-floor(previousRayPos/node_width)), vec3(0))); // nope, le mini step step 2...
-            // Et si on s'en servait pour l'occlusion ambiante?
-            mask = vec3(equal(tMax, vec3(rayStep)));
-            rayPos += MINI_STEP_SIZE*raySign*mask;
-
-        /*
-            ivec3 mapPos = ivec3(floor(rayPos/node_width));
-            vec3 sideDist = (sign(rayDir) * (vec3(mapPos) - rayPos/node_width) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
-            bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
-            sideDist += vec3(mask) * deltaDist;
-            mapPos += ivec3(vec3(mask)) * rayStep;
-            previousRayPos = rayPos;
-            rayPos += rayDir;*/
 
             // Quick exit #2: ray exiting the volume
             if (any(greaterThanEqual(rayPos, terrainSize)) || any(lessThan(rayPos, vec3(0)))) break;
 
             // While pos+step is not in current_node, step up
             do {
-                node_width *= NODE_WIDTH;
                 depth -= 1;
                 current_node = stack[depth];
             } while (depth > 0 && any(lessThan(rayPos, previousRayPos - mod(previousRayPos, node_width))) || any(greaterThanEqual(rayPos, previousRayPos + node_width - mod(previousRayPos, node_width))));
-        }
 
-        // TODO finish the above code
-        // TODO support chunk leafs (I'm scared)
+        }while(color_code != 1);
+        // encase this with the above with a do - while not hit
 
         // ensuring the color code is valid
         if (color_code >= colors.length()) {
@@ -191,8 +223,7 @@ void main()
             // using per-node color to debug the octree
             // the whole "else-if" block can be commented to restore the original colors
             color.xyz = debug_colors[previous_node % debug_colors.length()].xyz;
-        #endif
-        #ifdef USE_FAKE_LIGHT
+        #elif defined(USE_FAKE_LIGHT)
         } else if (color_code > 1){
             // setting the pixel color using the color table
             color.xyz = colors[color_code].xyz*dot(mask*vec3(0.9, 0.7, 0.4), vec3(1));

@@ -17,7 +17,7 @@ void client_start(void) {
      */
     INFO("Generating terrain.");
     Terrain terrain;
-    terrain_init(&terrain, 12);
+    terrain_init(&terrain, 6);
     camera_pos = (vec3){-0.25*terrain.width,1.25*terrain.width, -0.25*terrain.width};
     camera_forward = (vec3) {0.5, -0.6, 0.5};
 
@@ -31,6 +31,7 @@ void client_start(void) {
     /**
      * Initializing renderer, passing it the context so it initialize the framebuffer at the right size
      */
+    INFO("Initializing renderer.");
     render_init(window);
 
     /**

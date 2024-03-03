@@ -207,7 +207,7 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                     if (depth == 0) { // surprise! it's not a node, it's a chunk!
 
                         // since it's a chunk, we allocate from the chunk pool
-//                        u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
+                        u32 chunk_id = poolAllocatorAlloc(&terrain->chunkPool);
 
                         // then update the current node address. In this specific case, it's probably not necessary, oh well.
                         node = poolAllocatorGet(&terrain->nodePool, node_address);
@@ -217,11 +217,11 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
                         (*node)[dx + dy * NODE_WIDTH + dz * NODE_WIDTH * NODE_WIDTH] = (GRASS << 24); // | (chunk_id & 0x0fff);
 
                         // actual chunk gen is here, in the terrain_generate_chunk function.
-//                        terrain_generate_chunk(terrain,
-//                                               cx + dx * subnode_width,
-//                                               cy + dy * subnode_width,
-//                                               cz + dz * subnode_width,
-//                                               poolAllocatorGet(&terrain->chunkPool, chunk_id));
+                        terrain_generate_chunk(terrain,
+                                               cx + dx * subnode_width,
+                                               cy + dy * subnode_width,
+                                               cz + dz * subnode_width,
+                                               poolAllocatorGet(&terrain->chunkPool, chunk_id));
 
                         // at last updating the stats...
                         stats->mixed_nodes_per_level[depth] += 1;
@@ -256,6 +256,18 @@ static void terrain_generate_recursive(Terrain *terrain, u32 cx, u32 cy, u32 cz,
 
 }
 
-static void terrain_generate_chunk(Terrain *pTerrain, u32 x, u32 y, u32 z, Chunk (*chunk)) {
-
+static void terrain_generate_chunk(Terrain *terrain, u32 x, u32 y, u32 z, Chunk (*chunk)) {
+    u32 scale = min(terrain->width, 8192);
+    for(int dx=0; dx<CHUNK_WIDTH; dx++){
+        for(int dy=0; dy<CHUNK_WIDTH; dy++){
+            u32 h = 0.25 * scale + 0.5 * scale * (fnlGetNoise2D(&noiseGen2D, (x+dx) * 1e-4, (y+dy) * 1e-4) * 0.5 + 0.5);
+            u32 offset = (x+dx)+(y+dy)*CHUNK_WIDTH;
+            for(int dz=0; z+dz<h; dz++){
+                *chunk[offset+(z+dz)*CHUNK_WIDTH*CHUNK_WIDTH] = STONE;
+            }
+            for(int dz=h; dz<CHUNK_WIDTH; dz++){
+                *chunk[offset+(z+dz)*CHUNK_WIDTH*CHUNK_WIDTH] = AIR;
+            }
+        }
+    }
 }

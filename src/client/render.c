@@ -53,14 +53,14 @@ void render_draw_frame(Terrain *terrain) {
         // Naive implementation. Must be improved
         if (terrain->chunkPool.size != currentChunkBufferSize) {
             glNamedBufferData(terrainChunkPoolSSBO, terrain->chunkPool.size * terrain->chunkPool.unitSize,
-                              terrain->chunkPool.memory, GL_STATIC_DRAW);
+                              terrain->chunkPool.memory, GL_STATIC_COPY);
         } else {
             glNamedBufferSubData(terrainChunkPoolSSBO, 0, terrain->chunkPool.size * terrain->chunkPool.unitSize,
                                  terrain->chunkPool.memory);
         }
         if (terrain->nodePool.size != currentNodeBufferSize) {
             glNamedBufferData(terrainNodePoolSSBO, terrain->nodePool.size * terrain->nodePool.unitSize,
-                              terrain->nodePool.memory, GL_STATIC_DRAW);
+                              terrain->nodePool.memory, GL_STATIC_COPY);
         } else {
             glNamedBufferSubData(terrainNodePoolSSBO, 0, terrain->nodePool.size * terrain->nodePool.unitSize,
                                  terrain->nodePool.memory);
