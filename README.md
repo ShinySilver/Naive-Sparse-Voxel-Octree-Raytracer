@@ -17,7 +17,7 @@ A similar view, but with a real terrain rather than a weird slope:
 ![image](https://github.com/user-attachments/assets/e8095f24-6755-4c49-a608-52bb2000d3c3)
 
 I'll be archiving it soon as I want to change the acceleration structure which means changing most of the code, and I feel like it will be faster to restart from scratch :)
-All in all, this project made me learn a lot on a lot of programmed-related things, and removed some dust from my algebra skills.
+All in all, this project made me learn a lot, and removed some dust on my algebra skills.
 And most importantly, I had a lot of fun designing, and debugging everything. See below for random screenshots taken during debugging. 100% would recommend.
 
 ![image](https://github.com/user-attachments/assets/294763f3-6e20-4e07-8eab-78ddf10c9567)
